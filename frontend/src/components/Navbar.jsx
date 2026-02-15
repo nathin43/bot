@@ -19,10 +19,12 @@ const Navbar = () => {
   const [menuOpen, setMenuOpen] = useState(false);
 
   const handleLogout = () => {
-    logout();
-    info('You have been logged out 👋');
-    navigate('/');
     setDropdownOpen(false);
+    logout(() => {
+      // This callback runs after animation completes
+      info('You have been logged out 👋');
+      navigate('/');
+    });
   };
 
   return (

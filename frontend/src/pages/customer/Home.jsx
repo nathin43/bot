@@ -245,6 +245,23 @@ const Home = () => {
       
       {/* Hero Section */}
       <section className="hero">
+        {/* Animated Background Elements */}
+        <div className="hero-animated-bg">
+          <div className="hero-gradient-orb orb-1"></div>
+          <div className="hero-gradient-orb orb-2"></div>
+          <div className="hero-gradient-orb orb-3"></div>
+          <div className="hero-wave wave-1"></div>
+          <div className="hero-wave wave-2"></div>
+          <div className="hero-wave wave-3"></div>
+        </div>
+        
+        {/* Floating Particles */}
+        <div className="hero-particles">
+          {[...Array(20)].map((_, i) => (
+            <div key={i} className={`particle particle-${i + 1}`}></div>
+          ))}
+        </div>
+        
         <div className="container hero-container">
           <div className="hero-content">
             <span className="hero-label">WELCOME TO MANI ELECTRICAL</span>
@@ -253,7 +270,10 @@ const Home = () => {
               <span className="hero-title-line line-2">APPLIANCES EVER!</span>
             </h1>
             <p className="hero-description">Find everything you need for your electrical projects. High-quality products at unbeatable prices with fast delivery.</p>
-            <Link to="/products" className="btn-buy-product hero-cta">Buy Products</Link>
+            <Link to="/products" className="btn-buy-product hero-cta">
+              <span className="btn-shimmer"></span>
+              Buy Products
+            </Link>
           </div>
 
           <div className="hero-image-container">
@@ -427,35 +447,29 @@ const Home = () => {
             </div>
           ) : products.length > 0 ? (
             <div className="featured-carousel-wrapper">
-              {/* Main Featured Card */}
-              <div className="featured-card-main">
-                <div className="featured-image-wrapper">
-                  <img 
-                    src={products[currentProductIndex].image} 
-                    alt={products[currentProductIndex].name} 
-                    className="featured-image"
-                    onError={(e) => {
-                      e.target.src = 'https://via.placeholder.com/400x400?text=Product';
-                    }}
-                  />
+              {/* Vertical Box Card */}
+              <div className="featured-card-vertical">
+                {/* Image Section at Top */}
+                <div className="featured-image-section">
+                  <div className="featured-image-box">
+                    <img 
+                      src={products[currentProductIndex].image} 
+                      alt={products[currentProductIndex].name} 
+                      className="featured-image"
+                      onError={(e) => {
+                        e.target.src = 'https://via.placeholder.com/400x400?text=Product';
+                      }}
+                    />
+                  </div>
                 </div>
 
-                <div className="featured-card-content">
-                  <div className="featured-header">
-                    <span className="featured-category-badge">
-                      {products[currentProductIndex].category?.toUpperCase()}
-                    </span>
-                    {products[currentProductIndex].stock > 0 && (
-                      <span className="featured-stock-badge">
-                        <svg className="stock-icon" viewBox="0 0 20 20" fill="currentColor">
-                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"/>
-                        </svg>
-                        In Stock
-                      </span>
-                    )}
-                  </div>
+                {/* Details Section Below */}
+                <div className="featured-details-section">
+                  <span className="featured-category-pill">
+                    {products[currentProductIndex].category?.toUpperCase()}
+                  </span>
 
-                  <h3 className="featured-product-name">
+                  <h3 className="featured-product-title">
                     {products[currentProductIndex].name}
                   </h3>
 
@@ -463,24 +477,17 @@ const Home = () => {
                     Premium quality electrical component for residential and commercial applications
                   </p>
 
-                  <div className="featured-product-footer">
-                    <div className="featured-price-wrapper">
-                      <span className="featured-price-label">Price</span>
-                      <span className="featured-price">
-                        ₹{products[currentProductIndex].price?.toLocaleString()}
-                      </span>
-                    </div>
-
-                    <Link 
-                      to={`/product/${products[currentProductIndex]._id}`} 
-                      className="featured-btn-primary"
-                    >
-                      <span>View Details</span>
-                      <svg className="btn-arrow" viewBox="0 0 20 20" fill="currentColor">
-                        <path fillRule="evenodd" d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z" clipRule="evenodd"/>
-                      </svg>
-                    </Link>
+                  <div className="featured-price-text">
+                    ₹{products[currentProductIndex].price?.toLocaleString()}
                   </div>
+
+                  <Link 
+                    to={`/product/${products[currentProductIndex]._id}`} 
+                    className="featured-btn-full"
+                  >
+                    <span>View Details</span>
+                    <span className="arrow-right">→</span>
+                  </Link>
                 </div>
               </div>
 

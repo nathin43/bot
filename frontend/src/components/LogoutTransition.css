@@ -1,0 +1,399 @@
+/* Logout Transition Overlay */
+.logout-transition-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%);
+  animation: logoutOverlayFadeIn 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+  overflow: hidden;
+}
+
+@keyframes logoutOverlayFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Animated Background Elements */
+.logout-animated-bg {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  opacity: 0.8;
+}
+
+.logout-gradient-orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(100px);
+  opacity: 0;
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: 1;
+  animation-fill-mode: forwards;
+}
+
+.logout-gradient-orb.orb-1 {
+  top: 20%;
+  left: 20%;
+  width: 400px;
+  height: 400px;
+  background: radial-gradient(circle, rgba(0, 212, 255, 0.6) 0%, rgba(0, 150, 255, 0.3) 50%, transparent 70%);
+  animation: logoutOrb1 1.2s ease-out forwards;
+}
+
+.logout-gradient-orb.orb-2 {
+  bottom: 20%;
+  right: 20%;
+  width: 500px;
+  height: 500px;
+  background: radial-gradient(circle, rgba(34, 211, 238, 0.5) 0%, rgba(14, 165, 233, 0.25) 50%, transparent 70%);
+  animation: logoutOrb2 1.2s ease-out 0.1s forwards;
+}
+
+.logout-gradient-orb.orb-3 {
+  top: 50%;
+  left: 50%;
+  width: 600px;
+  height: 600px;
+  background: radial-gradient(circle, rgba(56, 189, 248, 0.4) 0%, rgba(14, 116, 144, 0.2) 50%, transparent 70%);
+  animation: logoutOrb3 1.2s ease-out 0.2s forwards;
+  transform: translate(-50%, -50%);
+}
+
+@keyframes logoutOrb1 {
+  0% {
+    opacity: 0;
+    transform: scale(0.5) translate(-100px, -100px);
+  }
+  100% {
+    opacity: 0.8;
+    transform: scale(1.2) translate(0, 0);
+  }
+}
+
+@keyframes logoutOrb2 {
+  0% {
+    opacity: 0;
+    transform: scale(0.5) translate(100px, 100px);
+  }
+  100% {
+    opacity: 0.7;
+    transform: scale(1.3) translate(0, 0);
+  }
+}
+
+@keyframes logoutOrb3 {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.3);
+  }
+  100% {
+    opacity: 0.6;
+    transform: translate(-50%, -50%) scale(1.5);
+  }
+}
+
+/* Floating Particles */
+.logout-particles {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.logout-particle {
+  position: absolute;
+  width: 4px;
+  height: 4px;
+  background: rgba(0, 212, 255, 0.9);
+  border-radius: 50%;
+  box-shadow: 0 0 10px rgba(0, 212, 255, 0.9),
+              0 0 20px rgba(0, 212, 255, 0.5),
+              0 0 30px rgba(0, 212, 255, 0.3);
+  animation: logoutParticleFade 1.2s ease-out forwards;
+}
+
+/* Position particles in a circular pattern */
+.logout-particle.particle-1 { left: 50%; top: 10%; animation-delay: 0s; }
+.logout-particle.particle-2 { left: 60%; top: 15%; animation-delay: 0.05s; }
+.logout-particle.particle-3 { left: 70%; top: 25%; animation-delay: 0.1s; }
+.logout-particle.particle-4 { left: 80%; top: 40%; animation-delay: 0.15s; }
+.logout-particle.particle-5 { left: 85%; top: 55%; animation-delay: 0.2s; }
+.logout-particle.particle-6 { left: 80%; top: 70%; animation-delay: 0.25s; }
+.logout-particle.particle-7 { left: 70%; top: 80%; animation-delay: 0.3s; }
+.logout-particle.particle-8 { left: 55%; top: 88%; animation-delay: 0.35s; }
+.logout-particle.particle-9 { left: 40%; top: 88%; animation-delay: 0.4s; }
+.logout-particle.particle-10 { left: 25%; top: 80%; animation-delay: 0.45s; }
+.logout-particle.particle-11 { left: 15%; top: 65%; animation-delay: 0.5s; }
+.logout-particle.particle-12 { left: 12%; top: 50%; animation-delay: 0.55s; }
+.logout-particle.particle-13 { left: 18%; top: 35%; animation-delay: 0.6s; }
+.logout-particle.particle-14 { left: 30%; top: 20%; animation-delay: 0.65s; }
+.logout-particle.particle-15 { left: 42%; top: 12%; animation-delay: 0.7s; }
+
+@keyframes logoutParticleFade {
+  0% {
+    opacity: 0;
+    transform: scale(0) translateY(0);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.5) translateY(-20px);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0.5) translateY(-40px);
+  }
+}
+
+/* Electric Pulse Ring */
+.logout-pulse-container {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1;
+}
+
+.logout-pulse-ring {
+  position: absolute;
+  border-radius: 50%;
+  border: 2px solid rgba(0, 212, 255, 0.6);
+  animation: logoutPulseExpand 1.5s ease-out forwards;
+}
+
+.logout-pulse-ring.ring-1 {
+  animation-delay: 0s;
+}
+
+.logout-pulse-ring.ring-2 {
+  animation-delay: 0.2s;
+}
+
+.logout-pulse-ring.ring-3 {
+  animation-delay: 0.4s;
+}
+
+.logout-pulse-ring.ring-4 {
+  animation-delay: 0.6s;
+}
+
+@keyframes logoutPulseExpand {
+  0% {
+    width: 50px;
+    height: 50px;
+    opacity: 1;
+    box-shadow: 0 0 20px rgba(0, 212, 255, 0.8),
+                0 0 40px rgba(0, 212, 255, 0.4);
+  }
+  100% {
+    width: 800px;
+    height: 800px;
+    opacity: 0;
+    box-shadow: 0 0 60px rgba(0, 212, 255, 0.2),
+                0 0 100px rgba(0, 212, 255, 0.1);
+  }
+}
+
+/* Content */
+.logout-content {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24px;
+  animation: logoutContentFadeIn 0.5s ease-out 0.3s backwards;
+}
+
+@keyframes logoutContentFadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.9) translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+/* Icon Wrapper */
+.logout-icon-wrapper {
+  position: relative;
+  animation: logoutIconPulse 1.5s ease-in-out infinite;
+}
+
+@keyframes logoutIconPulse {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.1);
+  }
+}
+
+.logout-icon {
+  width: 80px;
+  height: 80px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 212, 255, 0.1);
+  border-radius: 50%;
+  border: 2px solid rgba(0, 212, 255, 0.4);
+  color: #00d4ff;
+  position: relative;
+  box-shadow: 0 0 30px rgba(0, 212, 255, 0.3),
+              0 0 60px rgba(0, 212, 255, 0.15),
+              inset 0 0 20px rgba(0, 212, 255, 0.1);
+}
+
+.logout-icon::before {
+  content: '';
+  position: absolute;
+  inset: -8px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  background: linear-gradient(90deg, 
+    transparent, 
+    rgba(0, 212, 255, 0.8), 
+    transparent) border-box;
+  -webkit-mask: linear-gradient(#fff 0 0) padding-box, 
+                linear-gradient(#fff 0 0);
+  -webkit-mask-composite: destination-out;
+  mask-composite: exclude;
+  animation: logoutIconRotate 2s linear infinite;
+}
+
+@keyframes logoutIconRotate {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Text */
+.logout-text {
+  font-size: 28px;
+  font-weight: 700;
+  color: #ffffff;
+  margin: 0;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.3),
+               0 0 30px rgba(0, 212, 255, 0.3);
+  letter-spacing: 0.5px;
+  animation: logoutTextPulse 1.5s ease-in-out infinite;
+}
+
+@keyframes logoutTextPulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+/* Spinner */
+.logout-spinner {
+  margin-top: 8px;
+}
+
+.spinner-circle {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  border: 3px solid rgba(0, 212, 255, 0.2);
+  border-top-color: #00d4ff;
+  animation: logoutSpinnerRotate 0.8s linear infinite;
+  box-shadow: 0 0 20px rgba(0, 212, 255, 0.3);
+}
+
+@keyframes logoutSpinnerRotate {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Mobile Responsive */
+@media (max-width: 768px) {
+  .logout-gradient-orb.orb-1,
+  .logout-gradient-orb.orb-2,
+  .logout-gradient-orb.orb-3 {
+    width: 300px;
+    height: 300px;
+    filter: blur(70px);
+  }
+
+  .logout-pulse-ring {
+    display: none;
+  }
+
+  .logout-particle:nth-child(n+9) {
+    display: none;
+  }
+
+  .logout-text {
+    font-size: 22px;
+  }
+
+  .logout-icon {
+    width: 60px;
+    height: 60px;
+  }
+
+  .logout-icon svg {
+    width: 40px;
+    height: 40px;
+  }
+
+  .spinner-circle {
+    width: 40px;
+    height: 40px;
+  }
+}
+
+/* Accessibility: Respect user's motion preferences */
+@media (prefers-reduced-motion: reduce) {
+  .logout-gradient-orb,
+  .logout-particle,
+  .logout-pulse-ring,
+  .logout-icon::before,
+  .logout-icon-wrapper,
+  .logout-text {
+    animation: none !important;
+  }
+
+  .logout-transition-overlay {
+    animation: logoutOverlayFadeInSimple 0.3s ease forwards;
+  }
+
+  @keyframes logoutOverlayFadeInSimple {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  .logout-content {
+    animation: logoutContentFadeInSimple 0.3s ease forwards;
+  }
+
+  @keyframes logoutContentFadeInSimple {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  .spinner-circle {
+    animation: logoutSpinnerRotate 1.5s linear infinite !important;
+  }
+}

@@ -39,11 +39,8 @@ const productSchema = new mongoose.Schema({
     default: 0
   },
   specifications: {
-    power: String,
-    voltage: String,
-    warranty: String,
-    color: String,
-    dimensions: String
+    type: mongoose.Schema.Types.Mixed,
+    default: {}
   },
   ratings: {
     average: {

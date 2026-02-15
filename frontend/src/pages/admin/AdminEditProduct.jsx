@@ -186,6 +186,9 @@ const AdminEditProduct = () => {
       const { data } = await API.get(`/products/${id}`);
       const product = data.product;
 
+      console.log('Fetched product data:', product);
+      console.log('Product specifications:', product.specifications);
+
       setFormData({
         name: product.name || '',
         description: product.description || '',
@@ -196,7 +199,10 @@ const AdminEditProduct = () => {
         specifications: product.specifications || {}
       });
       setPreview(product.image || '');
+      
+      console.log('Form data set with specifications:', product.specifications);
     } catch (err) {
+      console.error('Error fetching product:', err);
       setError('Product not found');
       setTimeout(() => navigate('/admin/products'), 2000);
     } finally {
@@ -283,6 +289,16 @@ const AdminEditProduct = () => {
 
   const renderSpecField = (field, isRequired) => {
     const value = formData.specifications[field.key] || '';
+    
+    // Debug logging
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`Rendering field ${field.key}:`, {
+        specValue: formData.specifications[field.key],
+        finalValue: value,
+        allSpecs: formData.specifications
+      });
+    }
+    
     const commonProps = {
       name: field.key,
       value,

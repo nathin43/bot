@@ -323,6 +323,16 @@ exports.createProduct = async (req, res) => {
       imagePath = `/uploads/products/${req.file.filename}`;
     }
 
+    // Parse specifications if it's a JSON string
+    if (req.body.specifications && typeof req.body.specifications === 'string') {
+      try {
+        req.body.specifications = JSON.parse(req.body.specifications);
+      } catch (e) {
+        console.error('Failed to parse specifications:', e);
+        req.body.specifications = {};
+      }
+    }
+
     const productData = {
       ...req.body,
       image: imagePath || req.body.image
@@ -362,6 +372,16 @@ exports.updateProduct = async (req, res) => {
     // Get image path if uploaded
     if (req.file) {
       req.body.image = `/uploads/products/${req.file.filename}`;
+    }
+
+    // Parse specifications if it's a JSON string
+    if (req.body.specifications && typeof req.body.specifications === 'string') {
+      try {
+        req.body.specifications = JSON.parse(req.body.specifications);
+      } catch (e) {
+        console.error('Failed to parse specifications:', e);
+        req.body.specifications = {};
+      }
     }
 
     product = await Product.findByIdAndUpdate(req.params.id, req.body, {

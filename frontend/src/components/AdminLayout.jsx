@@ -40,8 +40,10 @@ const AdminLayout = ({ children }) => {
   };
 
   const handleLogout = () => {
-    adminLogout();
-    navigate('/admin/login');
+    adminLogout(() => {
+      // This callback runs after animation completes
+      navigate('/admin/login');
+    });
   };
 
   const menuItems = [
