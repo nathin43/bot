@@ -1,5 +1,6 @@
 const Order = require('../models/Order');
 const Report = require('../models/Report');
+const ReportMessage = require('../models/ReportMessage');
 
 /**
  * User Report Controller
@@ -225,6 +226,96 @@ exports.generateMyReport = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to generate report',
+      error: error.message
+    });
+  }
+};
+
+/**
+ * Get User's Report Messages (Inbox)
+ * Users can view ONLY their own report messages sent by admin
+ * 
+ * @route GET /api/user/reports/messages
+ * @access Private/User
+ */
+exports.getMyReportMessages = async (req, res) => {
+  try {
+    const userId = req.user.id; // Get from JWT token
+    const { page = 1, limit = 20, status, unreadOnly } = req.query;
+
+    // Build filter query (ONLY for this user)
+    const filters = { userId };
+    
+    if (status) filters.status = status;
+    if (unreadOnly === 'true') filters.isRead = false;
+
+    const skip = (page - 1) * limit;
+
+    const messages = await ReportMessage.find(filters)
+      .populate('sentBy', 'name email')
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(parseInt(limit));
+
+    const totalMessages = await ReportMessage.countDocuments(filters);
+    const unreadCount = await ReportMessage.countDocuments({ userId, isRead: false });
+
+    res.status(200).json({
+      success: true,
+      count: messages.length,
+      totalMessages,
+      unreadCount,
+      totalPages: Math.ceil(totalMessages / limit),
+      currentPage: parseInt(page),
+      messages
+    });
+  } catch (error) {
+    console.error('Error fetching user report messages:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch report messages',
+      error: error.message
+    });
+  }
+};
+
+/**
+ * Mark Report Message as Read
+ * User marks their own report message as read
+ * 
+ * @route PATCH /api/user/reports/messages/:messageId/read
+ * @access Private/User
+ */
+exports.markReportMessageAsRead = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { messageId } = req.params;
+
+    // Find message and verify ownership
+    const message = await ReportMessage.findOne({ _id: messageId, userId });
+
+    if (!message) {
+      return res.status(404).json({
+        success: false,
+        message: 'Report message not found or you do not have access'
+      });
+    }
+
+    // Update read status
+    message.isRead = true;
+    message.readAt = new Date();
+    await message.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Report message marked as read',
+      reportMessage: message
+    });
+  } catch (error) {
+    console.error('Error marking message as read:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to mark message as read',
       error: error.message
     });
   }

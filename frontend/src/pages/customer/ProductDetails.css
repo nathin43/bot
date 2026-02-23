@@ -333,102 +333,262 @@
 .action-buttons .btn {
   height: 48px;
   /* Fixed height */
-  border-radius: 14px;
+  border-radius: 50px;
   font-size: 15px;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   display: flex;
   align-items: center;
   justify-content: center;
+  gap: 8px;
+  position: relative;
+  overflow: hidden;
+  border: none;
 }
 
-/* Primary: Add to Cart */
+.btn-icon {
+  width: 18px;
+  height: 18px;
+  transition: transform 0.25s ease-in-out, opacity 0.25s ease-in-out;
+}
+
+/* ==========================================
+   ADD TO CART - PREMIUM ANIMATED GRADIENT CTA
+   Modern, eye-catching with continuous animations
+   ========================================== */
 .add-to-cart-btn {
-  background: linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%);
+  /* Dynamic gradient background */
+  background: linear-gradient(135deg, #1E3A8A 0%, #2563EB 50%, #1E3A8A 100%);
+  background-size: 200% 100%;
   color: #ffffff;
-  border: none;
-  box-shadow: 0 6px 20px rgba(99, 102, 241, 0.3);
-  position: relative;
-  overflow: hidden;
+  
+  /* Soft glow effect */
+  box-shadow: 0 2px 8px rgba(30, 58, 138, 0.25),
+              0 0 20px rgba(37, 99, 235, 0.15),
+              0 4px 12px rgba(30, 58, 138, 0.2);
+  
+  /* Smooth transitions */
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  
+  /* Continuous animations */
+  animation: addToCartFloat 2.8s ease-in-out infinite,
+             addToCartGradientFlow 3s ease-in-out infinite;
 }
 
+/* Gentle floating animation */
+@keyframes addToCartFloat {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-2px);
+  }
+}
+
+/* Gradient flow animation */
+@keyframes addToCartGradientFlow {
+  0%, 100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}
+
+/* Continuous Shimmer Effect - always active */
 .add-to-cart-btn::before {
-  content: "🛒 ";
-  margin-right: 8px;
-  font-size: 18px;
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 60%;
+  height: 100%;
+  background: linear-gradient(90deg,
+    transparent,
+    rgba(255, 255, 255, 0.35),
+    transparent);
+  animation: continuousShimmer 2.5s ease-in-out infinite;
+  pointer-events: none;
 }
 
+@keyframes continuousShimmer {
+  0% {
+    left: -60%;
+  }
+  50%, 100% {
+    left: 140%;
+  }
+}
+
+/* Ripple effect on click */
 .add-to-cart-btn::after {
-  content: "";
+  content: '';
   position: absolute;
   top: 50%;
   left: 50%;
   width: 0;
   height: 0;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.5);
   transform: translate(-50%, -50%);
-  transition: width 0.6s, height 0.6s;
+  opacity: 0;
+  pointer-events: none;
 }
 
+/* HOVER STATE - Enhanced scale, brighter gradient, deeper shadow */
 .add-to-cart-btn:hover {
-  background: linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%);
-  transform: translateY(-3px) scale(1.02);
-  box-shadow: 0 12px 30px rgba(99, 102, 241, 0.45);
+  transform: scale(1.05) translateY(-1px);
+  
+  /* Brighter gradient */
+  background: linear-gradient(135deg, #2563EB 0%, #3B82F6 50%, #2563EB 100%);
+  background-size: 200% 100%;
+  
+  /* Enhanced glow and depth */
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.35),
+              0 0 30px rgba(59, 130, 246, 0.25),
+              0 6px 16px rgba(37, 99, 235, 0.3);
+  
+  /* Continue animations on hover */
+  animation: addToCartFloat 2.8s ease-in-out infinite,
+             addToCartGradientFlow 3s ease-in-out infinite;
 }
 
-.add-to-cart-btn:hover::after {
-  width: 300px;
-  height: 300px;
-}
-
+/* ACTIVE STATE - Quick bounce with ripple */
 .add-to-cart-btn:active {
-  transform: translateY(-1px) scale(0.98);
+  transform: scale(0.97);
+  
+  box-shadow: 0 2px 6px rgba(30, 58, 138, 0.25),
+              0 0 15px rgba(37, 99, 235, 0.15);
+  
+  /* Fast transition for instant feedback */
+  transition: all 0.1s ease-out;
 }
 
-/* Secondary: Buy Now */
+/* Ripple animation trigger on click */
+.add-to-cart-btn:active::after {
+  animation: ripplePulse 0.6s ease-out;
+}
+
+@keyframes ripplePulse {
+  0% {
+    width: 0;
+    height: 0;
+    opacity: 0.8;
+  }
+  100% {
+    width: 250%;
+    height: 250%;
+    opacity: 0;
+  }
+}
+
+/* ==========================================
+   BUY NOW - PREMIUM ANIMATED GRADIENT CTA
+   Cyan/Teal gradient with continuous animations
+   ========================================== */
 .buy-now-btn {
-  background: linear-gradient(135deg, #0ea5e9 0%, #06b6d4 100%);
+  /* Dynamic gradient background */
+  background: linear-gradient(135deg, #0e7490 0%, #0891b2 50%, #0e7490 100%);
+  background-size: 200% 100%;
   color: #ffffff;
-  border: none;
-  box-shadow: 0 6px 20px rgba(14, 165, 233, 0.3);
-  position: relative;
-  overflow: hidden;
+  
+  /* Soft glow effect */
+  box-shadow: 0 2px 8px rgba(14, 116, 144, 0.25),
+              0 0 20px rgba(8, 145, 178, 0.15),
+              0 4px 12px rgba(14, 116, 144, 0.2);
+  
+  /* Smooth transitions */
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  
+  /* Continuous animations */
+  animation: buyNowFloat 2.8s ease-in-out infinite,
+             buyNowGradientFlow 3s ease-in-out infinite;
 }
 
+/* Gentle floating animation */
+@keyframes buyNowFloat {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-2px);
+  }
+}
+
+/* Gradient flow animation */
+@keyframes buyNowGradientFlow {
+  0%, 100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}
+
+/* Continuous Shimmer Effect - always active */
 .buy-now-btn::before {
-  content: "⚡ ";
-  margin-right: 8px;
-  font-size: 18px;
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 60%;
+  height: 100%;
+  background: linear-gradient(90deg,
+    transparent,
+    rgba(255, 255, 255, 0.35),
+    transparent);
+  animation: continuousShimmer 2.5s ease-in-out infinite;
+  pointer-events: none;
 }
 
+/* Ripple effect on click */
 .buy-now-btn::after {
-  content: "";
+  content: '';
   position: absolute;
   top: 50%;
   left: 50%;
   width: 0;
   height: 0;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.5);
   transform: translate(-50%, -50%);
-  transition: width 0.6s, height 0.6s;
+  opacity: 0;
+  pointer-events: none;
 }
 
+/* HOVER STATE - Enhanced scale, brighter gradient, deeper shadow */
 .buy-now-btn:hover {
-  background: linear-gradient(135deg, #0284c7 0%, #0891b2 100%);
-  transform: translateY(-3px) scale(1.02);
-  box-shadow: 0 12px 30px rgba(14, 165, 233, 0.45);
+  transform: scale(1.05) translateY(-1px);
+  
+  /* Brighter gradient */
+  background: linear-gradient(135deg, #0891b2 0%, #06b6d4 50%, #0891b2 100%);
+  background-size: 200% 100%;
+  
+  /* Enhanced glow and depth */
+  box-shadow: 0 4px 12px rgba(8, 145, 178, 0.35),
+              0 0 30px rgba(6, 182, 212, 0.25),
+              0 6px 16px rgba(8, 145, 178, 0.3);
+  
+  /* Continue animations on hover */
+  animation: buyNowFloat 2.8s ease-in-out infinite,
+             buyNowGradientFlow 3s ease-in-out infinite;
 }
 
-.buy-now-btn:hover::after {
-  width: 300px;
-  height: 300px;
-}
-
+/* ACTIVE STATE - Quick bounce with ripple */
 .buy-now-btn:active {
-  transform: translateY(-1px) scale(0.98);
+  transform: scale(0.97);
+  
+  box-shadow: 0 2px 6px rgba(14, 116, 144, 0.25),
+              0 0 15px rgba(8, 145, 178, 0.15);
+  
+  /* Fast transition for instant feedback */
+  transition: all 0.1s ease-out;
+}
+
+/* Ripple animation trigger on click */
+.buy-now-btn:active::after {
+  animation: ripplePulse 0.6s ease-out;
 }
 
 .mobile-action-bar {

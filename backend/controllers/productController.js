@@ -197,6 +197,16 @@ exports.getProduct = async (req, res) => {
     try {
       const product = await Product.findById(req.params.id);
       if (product) {
+        console.log('✅ Product found in database:', {
+          id: product._id,
+          name: product.name,
+          category: product.category,
+          hasSpecifications: !!product.specifications,
+          specificationsType: typeof product.specifications,
+          specifications: product.specifications,
+          specsKeys: product.specifications ? Object.keys(product.specifications) : []
+        });
+        
         return res.status(200).json({
           success: true,
           product,
@@ -327,11 +337,20 @@ exports.createProduct = async (req, res) => {
     if (req.body.specifications && typeof req.body.specifications === 'string') {
       try {
         req.body.specifications = JSON.parse(req.body.specifications);
+        console.log('✅ Parsed specifications from JSON (create):', req.body.specifications);
       } catch (e) {
-        console.error('Failed to parse specifications:', e);
+        console.error('❌ Failed to parse specifications (create):', e);
         req.body.specifications = {};
       }
     }
+
+    console.log('✅ Creating product with specifications:', {
+      name: req.body.name,
+      category: req.body.category,
+      specificationsType: typeof req.body.specifications,
+      specifications: req.body.specifications,
+      specsKeys: req.body.specifications ? Object.keys(req.body.specifications) : []
+    });
 
     const productData = {
       ...req.body,
@@ -340,12 +359,18 @@ exports.createProduct = async (req, res) => {
 
     const product = await Product.create(productData);
 
+    console.log('✅ Product created successfully, specs saved as:', {
+      specifications: product.specifications,
+      specsKeys: product.specifications ? Object.keys(product.specifications) : []
+    });
+
     res.status(201).json({
       success: true,
       message: 'Product created successfully',
       product
     });
   } catch (error) {
+    console.error('❌ Error creating product:', error);
     res.status(500).json({
       success: false,
       message: error.message
@@ -378,15 +403,29 @@ exports.updateProduct = async (req, res) => {
     if (req.body.specifications && typeof req.body.specifications === 'string') {
       try {
         req.body.specifications = JSON.parse(req.body.specifications);
+        console.log('✅ Parsed specifications from JSON:', req.body.specifications);
       } catch (e) {
-        console.error('Failed to parse specifications:', e);
+        console.error('❌ Failed to parse specifications:', e);
         req.body.specifications = {};
       }
     }
 
+    console.log('✅ Updating product with specifications:', {
+      productId: req.params.id,
+      category: req.body.category,
+      specificationsType: typeof req.body.specifications,
+      specifications: req.body.specifications,
+      specsKeys: req.body.specifications ? Object.keys(req.body.specifications) : []
+    });
+
     product = await Product.findByIdAndUpdate(req.params.id, req.body, {
       new: true,
       runValidators: true
+    });
+
+    console.log('✅ Product updated successfully, specs are now:', {
+      specifications: product.specifications,
+      specsKeys: product.specifications ? Object.keys(product.specifications) : []
     });
 
     res.status(200).json({
@@ -395,6 +434,7 @@ exports.updateProduct = async (req, res) => {
       product
     });
   } catch (error) {
+    console.error('❌ Error updating product:', error);
     res.status(500).json({
       success: false,
       message: error.message

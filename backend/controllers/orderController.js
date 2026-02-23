@@ -202,6 +202,8 @@ exports.getOrder = async (req, res) => {
  */
 exports.getAllOrders = async (req, res) => {
   try {
+    console.log('📦 Fetching all orders for admin...');
+    
     const orders = await Order.find()
       .populate('user', 'name email phone')
       .populate({
@@ -210,17 +212,81 @@ exports.getAllOrders = async (req, res) => {
       })
       .sort('-createdAt');
 
+    console.log(`✅ Found ${orders.length} orders`);
+
     // Calculate total sales using totalAmount field (totalPrice for backward compatibility)
     const totalSales = orders.reduce((sum, order) => sum + (order.totalAmount || order.totalPrice || 0), 0);
 
+    // Always return 200 with success true, even if orders array is empty
     res.status(200).json({
       success: true,
       count: orders.length,
       totalSales,
-      orders
+      orders: orders || [] // Ensure orders is always an array
     });
   } catch (error) {
-    console.error('Error in getAllOrders:', error);
+    console.error('❌ Error in getAllOrders:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to fetch orders',
+      orders: [] // Return empty array even on error
+    });
+  }
+};
+
+/**
+ * Get order details for report message auto-fill (Admin only)
+ * @route GET /api/orders/:id/report-details
+ * @access Private/Admin
+ */
+exports.getOrderReportDetails = async (req, res) => {
+  try {
+    const identifier = req.params.id;
+    let order;
+
+    // Try to find by MongoDB ObjectId first
+    if (identifier.match(/^[0-9a-fA-F]{24}$/)) {
+      order = await Order.findById(identifier)
+        .populate('user', '_id name email')
+        .select('orderNumber user paymentMethod paymentDetails paymentStatus totalAmount orderStatus');
+    }
+    
+    // If not found or not a valid ObjectId, try finding by order number
+    if (!order) {
+      order = await Order.findOne({ orderNumber: identifier })
+        .populate('user', '_id name email')
+        .select('orderNumber user paymentMethod paymentDetails paymentStatus totalAmount orderStatus');
+    }
+
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: 'Order not found'
+      });
+    }
+
+    const reportDetails = {
+      userId: order.user._id,
+      userName: order.user.name,
+      userEmail: order.user.email,
+      orderId: order.orderNumber,
+      paymentId: order.paymentDetails?.razorpayPaymentId || 
+                 order.paymentDetails?.paymentId || 
+                 order.paymentDetails?.transactionId || 
+                 null,
+      invoiceId: `INV-${order.orderNumber}`,
+      paymentMethod: order.paymentMethod,
+      paymentStatus: order.paymentStatus,
+      orderStatus: order.orderStatus,
+      totalAmount: order.totalAmount
+    };
+
+    res.status(200).json({
+      success: true,
+      details: reportDetails
+    });
+  } catch (error) {
+    console.error('Error fetching order report details:', error);
     res.status(500).json({
       success: false,
       message: error.message

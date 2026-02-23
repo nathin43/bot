@@ -7,7 +7,8 @@ const {
   getAllOrders,
   updateOrderStatus,
   cancelOrder,
-  getOrdersByUserId
+  getOrdersByUserId,
+  getOrderReportDetails
 } = require('../controllers/orderController');
 const { protect, adminProtect } = require('../middleware/auth');
 const { checkCanPlaceOrder } = require('../middleware/checkUserStatus');
@@ -20,6 +21,7 @@ const { checkCanPlaceOrder } = require('../middleware/checkUserStatus');
 // Admin routes (must come before /:id routes)
 router.get('/', adminProtect, getAllOrders);
 router.get('/user/:userId', adminProtect, getOrdersByUserId);
+router.get('/:id/report-details', adminProtect, getOrderReportDetails);
 router.put('/:id/status', adminProtect, updateOrderStatus);
 
 // Customer routes

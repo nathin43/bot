@@ -101,6 +101,11 @@ const UserReportDetail = () => {
       showError('Failed to delete review');
     }
   };
+
+  const handleSendReportForOrder = (order) => {
+    // Navigate to send report page with order details
+    navigate(`/admin/reports/send/${userId}?orderId=${order.orderNumber || order._id}`);
+  };
   
   const handleDownloadInvoice = async (invoiceId) => {
     try {
@@ -231,6 +236,13 @@ const UserReportDetail = () => {
                 </td>
                 <td>
                   <div className="action-buttons">
+                    <button 
+                      className="btn-action btn-send-report"
+                      onClick={() => handleSendReportForOrder(order)}
+                      title="Send report message to user"
+                    >
+                      📨 Report
+                    </button>
                     <button 
                       className="btn-action btn-view"
                       onClick={() => handleViewOrder(order._id)}

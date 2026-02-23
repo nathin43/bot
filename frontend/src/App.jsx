@@ -30,6 +30,14 @@ import AdminManagement from './pages/admin/AdminManagement';
 import AdminReports from './pages/admin/AdminReports';
 import AdminContactMessages from './pages/admin/AdminContactMessages';
 import UserReportDetail from './pages/admin/UserReportDetailNew';
+import SendReportPage from './pages/admin/SendReportPage';
+
+// Admin Report Pages
+import SalesReport from './pages/admin/SalesReport';
+import StockReport from './pages/admin/StockReport';
+import CustomerReport from './pages/admin/CustomerReport';
+import PaymentReport from './pages/admin/PaymentReport';
+import OrderReport from './pages/admin/OrderReport';
 
 // Components
 import PrivateRoute from './components/PrivateRoute';
@@ -75,7 +83,13 @@ function App() {
         <Route path="/admin/orders" element={<AdminRoute><AdminOrders /></AdminRoute>} />
         <Route path="/admin/customers" element={<AdminRoute><AdminCustomers /></AdminRoute>} />
         <Route path="/admin/reports" element={<AdminRoute><AdminReports /></AdminRoute>} />
+        <Route path="/admin/reports/sales" element={<AdminRoute><SalesReport /></AdminRoute>} />
+        <Route path="/admin/reports/stock" element={<AdminRoute><StockReport /></AdminRoute>} />
+        <Route path="/admin/reports/customers" element={<AdminRoute><CustomerReport /></AdminRoute>} />
+        <Route path="/admin/reports/payments" element={<AdminRoute><PaymentReport /></AdminRoute>} />
+        <Route path="/admin/reports/orders" element={<AdminRoute><OrderReport /></AdminRoute>} />
         <Route path="/admin/reports/user/:userId" element={<AdminRoute><UserReportDetail /></AdminRoute>} />
+        <Route path="/admin/reports/send/:userId" element={<AdminRoute><SendReportPage /></AdminRoute>} />
         <Route path="/admin/contact-messages" element={<AdminRoute><AdminContactMessages /></AdminRoute>} />
         <Route path="/admin/admin-management" element={<MainAdminRoute><AdminManagement /></MainAdminRoute>} />
       </Routes>

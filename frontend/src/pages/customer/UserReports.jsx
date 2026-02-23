@@ -2,166 +2,117 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../hooks/useToast';
 import api from '../../services/api';
+import { initializeSocket, joinUserRoom, onReceiveReportMessage } from '../../services/socket';
 import './UserReports.css';
 
 /**
  * User Reports Component
- * Displays user's generated reports with download capability
+ * Displays admin-sent report messages in an inbox style
+ * Real-time message delivery via WebSocket
  */
 const UserReports = () => {
   const { user } = useAuth();
   const toast = useToast();
 
-  const [reports, setReports] = useState([]);
+  const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState('orders');
-  const [reviews, setReviews] = useState([]);
-  const [reviewsLoading, setReviewsLoading] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
   const [filters, setFilters] = useState({
     status: '',
-    startDate: '',
-    endDate: ''
+    unreadOnly: false
   });
 
-  const tabs = [
-    { key: 'orders', label: 'Orders', type: 'Order Report', icon: '🧾' },
-    { key: 'payments', label: 'Payments', type: 'Payment Report', icon: '💳' },
-    { key: 'invoices', label: 'Invoices', type: 'Invoice', icon: '🧾' },
-    { key: 'reviews', label: 'Reviews', type: 'Review Report', icon: '⭐' }
-  ];
-
-  const statusOptions = {
-    orders: ['Pending', 'Delivered', 'Cancelled'],
-    payments: ['Paid', 'Pending', 'Failed'],
-    invoices: ['Generated', 'Downloaded', 'Archived'],
-    reviews: []
-  };
-
-  // Fetch user's reports
-  const fetchUserReports = async () => {
+  // Fetch user's report messages
+  const fetchReportMessages = async () => {
     setLoading(true);
     try {
       const queryParams = new URLSearchParams();
-      const activeType = tabs.find(tab => tab.key === activeTab)?.type;
-      if (activeType) queryParams.append('type', activeType);
-      if (filters.startDate) queryParams.append('startDate', filters.startDate);
-      if (filters.endDate) queryParams.append('endDate', filters.endDate);
+      if (filters.status) queryParams.append('status', filters.status);
+      if (filters.unreadOnly) queryParams.append('unreadOnly', 'true');
 
-      const response = await api.get(`/user/reports?${queryParams.toString()}`);
+      const response = await api.get(`/user/reports/messages?${queryParams.toString()}`);
       if (response.data.success) {
-        setReports(response.data.reports);
+        setMessages(response.data.messages);
+        setUnreadCount(response.data.unreadCount);
       }
     } catch (error) {
-      toast.error('Failed to fetch reports');
-      console.error('Error fetching reports:', error);
+      toast.error('Failed to fetch report messages');
+      console.error('Error fetching report messages:', error);
     } finally {
       setLoading(false);
     }
   };
 
-  const fetchUserReviews = async () => {
-    setReviewsLoading(true);
-    try {
-      const response = await api.get('/reviews/user/my-reviews');
-      if (response.data.success) {
-        setReviews(response.data.reviews || []);
-      }
-    } catch (error) {
-      toast.error('Failed to fetch reviews');
-      console.error('Error fetching reviews:', error);
-    } finally {
-      setReviewsLoading(false);
-    }
-  };
-
   useEffect(() => {
-    if (!user?._id) return;
-    if (activeTab === 'reviews') {
-      fetchUserReviews();
-      return;
-    }
-    fetchUserReports();
-  }, [user?._id, activeTab, filters.startDate, filters.endDate]);
+    if (!user?.id) return;
+    fetchReportMessages();
+  }, [user?.id, filters.status, filters.unreadOnly]);
+
+  // Initialize Socket.IO and join user room for real-time messages
+  useEffect(() => {
+    if (!user?.id) return;
+
+    // Initialize socket connection
+    initializeSocket();
+    
+    // Join user's personal room
+    joinUserRoom(user.id);
+
+    // Listen for incoming report messages
+    const cleanup = onReceiveReportMessage((response) => {
+      if (response.success && response.message) {
+        console.log('📨 New report message received:', response.message);
+        
+        // Add new message to the top of the list
+        setMessages(prev => [response.message, ...prev]);
+        
+        // Increment unread count
+        setUnreadCount(prev => prev + 1);
+        
+        // Show notification
+        toast.success('📬 You received a new report message!');
+      }
+    });
+
+    // Cleanup on unmount
+    return () => {
+      if (cleanup) cleanup();
+    };
+  }, [user?.id]);
 
   // Handle filter changes
   const handleFilterChange = (e) => {
-    const { name, value } = e.target;
+    const { name, value, type, checked } = e.target;
     setFilters(prev => ({
       ...prev,
-      [name]: value
+      [name]: type === 'checkbox' ? checked : value
     }));
   };
 
   const handleClearFilters = () => {
     setFilters({
       status: '',
-      startDate: '',
-      endDate: ''
+      unreadOnly: false
     });
   };
 
-  const handleApplyFilters = () => {
-    fetchUserReports();
-  };
+  // Mark message as read
+  const markAsRead = async (messageId, isRead) => {
+    if (isRead) return; // Already read
 
-  // Download report
-  const handleDownloadReport = async (reportId) => {
     try {
-      const response = await api.get(`/user/reports/download/${reportId}`);
+      const response = await api.patch(`/user/reports/messages/${messageId}/read`);
       if (response.data.success) {
-        toast.success('Report downloaded successfully');
-        // Refresh reports
-        fetchUserReports();
+        // Update local state
+        setMessages(prev => prev.map(msg =>
+          msg._id === messageId ? { ...msg, isRead: true, readAt: new Date() } : msg
+        ));
+        setUnreadCount(prev => Math.max(0, prev - 1));
       }
     } catch (error) {
-      toast.error('Failed to download report');
+      console.error('Error marking message as read:', error);
     }
   };
-
-  const normalizeStatus = (status) => (status || '').toString().toLowerCase();
-
-  const formatStatus = (status) => {
-    if (!status) return 'N/A';
-    return status
-      .toString()
-      .replace(/_/g, ' ')
-      .replace(/\b\w/g, (c) => c.toUpperCase());
-  };
-
-  const formatPaymentMethod = (method) => {
-    if (!method) return 'N/A';
-    const value = method.toString().toLowerCase();
-    if (value.includes('cod') || value.includes('cash')) return 'COD';
-    if (value.includes('upi')) return 'UPI';
-    if (value.includes('card')) return 'Card';
-    return formatStatus(method);
-  };
-
-  const formatCurrency = (amount) => `₹${Number(amount || 0).toFixed(2)}`;
-
-  const getStatusClass = (status) => {
-    const normalized = normalizeStatus(status);
-    if (['paid', 'completed', 'delivered', 'downloaded'].includes(normalized)) return 'status-success';
-    if (['failed', 'cancelled', 'archived'].includes(normalized)) return 'status-danger';
-    return 'status-warning';
-  };
-
-  const filteredReports = reports.filter(report => {
-    if (!filters.status) return true;
-    const statusValue = normalizeStatus(filters.status);
-    if (activeTab === 'orders') return normalizeStatus(report.orderStatus) === statusValue;
-    if (activeTab === 'payments') return normalizeStatus(report.paymentStatus) === statusValue;
-    if (activeTab === 'invoices') return normalizeStatus(report.reportStatus) === statusValue;
-    return normalizeStatus(report.reportStatus) === statusValue;
-  });
-
-  const filteredReviews = reviews.filter(review => {
-    if (!filters.startDate && !filters.endDate) return true;
-    const reviewDate = new Date(review.createdAt);
-    if (filters.startDate && reviewDate < new Date(filters.startDate)) return false;
-    if (filters.endDate && reviewDate > new Date(filters.endDate)) return false;
-    return true;
-  });
 
   // Format date
   const formatDate = (dateString) => {
@@ -175,34 +126,46 @@ const UserReports = () => {
     });
   };
 
+  // Get status badge class
+  const getStatusClass = (status) => {
+    const statusMap = {
+      'Info': 'status-info',
+      'Warning': 'status-warning',
+      'Issue': 'status-danger',
+      'Summary': 'status-success'
+    };
+    return statusMap[status] || 'status-info';
+  };
+
+  // Get status icon
+  const getStatusIcon = (status) => {
+    const iconMap = {
+      'Info': 'ℹ️',
+      'Warning': '⚠️',
+      'Issue': '❌',
+      'Summary': '📊'
+    };
+    return iconMap[status] || 'ℹ️';
+  };
+
   return (
     <div className="user-reports-section">
       <div className="reports-header">
-        <h3>📊 My Reports</h3>
-        <p>View and manage your reports by category</p>
-      </div>
-
-      <div className="reports-tabs">
-        {tabs.map(tab => (
-          <button
-            key={tab.key}
-            type="button"
-            className={`tab-btn ${activeTab === tab.key ? 'active' : ''}`}
-            onClick={() => {
-              setActiveTab(tab.key);
-              setFilters(prev => ({ ...prev, status: '' }));
-            }}
-          >
-            <span className="tab-icon">{tab.icon}</span>
-            {tab.label}
-          </button>
-        ))}
+        <div>
+          <h3>📬 My Reports Inbox</h3>
+          <p>View report messages sent by admin</p>
+        </div>
+        {unreadCount > 0 && (
+          <div className="unread-badge">
+            {unreadCount} unread message{unreadCount !== 1 ? 's' : ''}
+          </div>
+        )}
       </div>
 
       {/* Filters */}
       <div className="reports-filters">
         <div className="filter-group">
-          <label>Status</label>
+          <label>Status Filter</label>
           <select
             name="status"
             value={filters.status}
@@ -210,209 +173,100 @@ const UserReports = () => {
             className="filter-select"
           >
             <option value="">All Status</option>
-            {statusOptions[activeTab].map(option => (
-              <option key={option} value={option.toLowerCase()}>
-                {option}
-              </option>
-            ))}
+            <option value="Info">Info</option>
+            <option value="Warning">Warning</option>
+            <option value="Issue">Issue</option>
+            <option value="Summary">Summary</option>
           </select>
         </div>
 
-        <div className="filter-group">
-          <label>From Date</label>
-          <input
-            type="date"
-            name="startDate"
-            value={filters.startDate}
-            onChange={handleFilterChange}
-            className="filter-input"
-          />
-        </div>
-
-        <div className="filter-group">
-          <label>To Date</label>
-          <input
-            type="date"
-            name="endDate"
-            value={filters.endDate}
-            onChange={handleFilterChange}
-            className="filter-input"
-          />
+        <div className="filter-group checkbox-group">
+          <label>
+            <input
+              type="checkbox"
+              name="unreadOnly"
+              checked={filters.unreadOnly}
+              onChange={handleFilterChange}
+            />
+            <span>Show unread only</span>
+          </label>
         </div>
 
         <div className="filter-actions">
           <button type="button" className="filter-btn clear" onClick={handleClearFilters}>
-            Clear
-          </button>
-          <button type="button" className="filter-btn apply" onClick={handleApplyFilters}>
-            Apply Filters
+            Clear Filters
           </button>
         </div>
       </div>
 
-      {/* Reports Cards */}
-      <div className="reports-cards">
-        {activeTab === 'reviews' ? (
-          reviewsLoading ? (
-            <div className="loading-state">
-              <div className="spinner"></div>
-              <p>Loading your reviews...</p>
-            </div>
-          ) : filteredReviews.length > 0 ? (
-            filteredReviews.map(review => (
-              <div key={review._id} className="report-card reviews">
-                <div className="card-header">
-                  <div className="card-title">
-                    <span className="card-icon">⭐</span>
-                    <div>
-                      <h4>{review.product?.name || 'Product Review'}</h4>
-                      <p>{formatDate(review.createdAt)}</p>
-                    </div>
-                  </div>
-                  <span className="status-badge status-success">Reviewed</span>
-                </div>
-
-                <div className="card-body">
-                  <div className="card-row">
-                    <span>Rating</span>
-                    <strong>{review.rating} ★</strong>
-                  </div>
-                  <div className="card-row">
-                    <span>Comment</span>
-                    <span>{review.feedback}</span>
-                  </div>
-                  <div className="card-row">
-                    <span>Admin Reply</span>
-                    <span>Not available yet</span>
-                  </div>
-                </div>
-              </div>
-            ))
-          ) : (
-            <div className="empty-state">
-              <p>No reports available for this category yet</p>
-              <small>Product reviews will appear here once submitted.</small>
-            </div>
-          )
-        ) : loading ? (
+      {/* Message Inbox */}
+      <div className="message-inbox">
+        {loading ? (
           <div className="loading-state">
             <div className="spinner"></div>
-            <p>Loading your reports...</p>
+            <p>Loading your messages...</p>
           </div>
-        ) : filteredReports.length > 0 ? (
-          filteredReports.map(report => (
-            <div key={report._id} className={`report-card ${activeTab}`}>
-              <div className="card-header">
-                <div className="card-title">
-                  <span className="card-icon">{tabs.find(tab => tab.key === activeTab)?.icon}</span>
-                  <div>
-                    <h4>
-                      {activeTab === 'orders' && `Order ${report.order?.orderNumber || 'N/A'}`}
-                      {activeTab === 'payments' && `Payment ${report.order?.orderNumber || 'N/A'}`}
-                      {activeTab === 'invoices' && `Invoice ${report.order?.orderNumber || 'N/A'}`}
-                      {activeTab === 'reviews' && 'Reviews & Feedback'}
-                    </h4>
-                    <p>{formatDate(report.orderDate || report.order?.createdAt || report.reportGeneratedAt)}</p>
+        ) : messages.length > 0 ? (
+          messages.map(msg => (
+            <div
+              key={msg._id}
+              className={`message-card ${!msg.isRead ? 'unread' : ''}`}
+              onClick={() => markAsRead(msg._id, msg.isRead)}
+            >
+              <div className="message-header">
+                <div className="message-title-section">
+                  <span className="message-icon">{getStatusIcon(msg.status)}</span>
+                  <div className="message-title-wrapper">
+                    <h4 className="message-title">{msg.title}</h4>
+                    {!msg.isRead && <span className="new-badge">NEW</span>}
                   </div>
                 </div>
-                <span className={`status-badge ${getStatusClass(
-                  activeTab === 'orders'
-                    ? report.orderStatus
-                    : activeTab === 'payments'
-                      ? report.paymentStatus
-                      : report.reportStatus
-                )}`}>
-                  {formatStatus(
-                    activeTab === 'orders'
-                      ? report.orderStatus
-                      : activeTab === 'payments'
-                        ? report.paymentStatus
-                        : report.reportStatus
+                <div className="message-meta">
+                  <span className={`status-tag ${getStatusClass(msg.status)}`}>
+                    {msg.status}
+                  </span>
+                  <span className="message-date">{formatDate(msg.createdAt)}</span>
+                </div>
+              </div>
+
+              <div className="message-body">
+                <p className="message-text">{msg.message}</p>
+
+                {/* Reference IDs */}
+                <div className="message-references">
+                  {msg.orderId && (
+                    <span className="ref-badge">
+                      🧾 Order: <strong>{msg.orderId}</strong>
+                    </span>
                   )}
-                </span>
+                  {msg.paymentId && (
+                    <span className="ref-badge">
+                      💳 Payment: <strong>{msg.paymentId}</strong>
+                    </span>
+                  )}
+                  {msg.invoiceId && (
+                    <span className="ref-badge">
+                      📄 Invoice: <strong>{msg.invoiceId}</strong>
+                    </span>
+                  )}
+                </div>
               </div>
 
-              <div className="card-body">
-                {activeTab === 'orders' && (
-                  <>
-                    <div className="card-row">
-                      <span>Products</span>
-                      <div className="card-list">
-                        {report.items?.map((item, index) => (
-                          <div key={index} className="card-list-item">
-                            {item.productName} × {item.quantity} ({formatCurrency(item.productPrice)})
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                    <div className="card-row">
-                      <span>Total Amount</span>
-                      <strong>{formatCurrency(report.totalAmount)}</strong>
-                    </div>
-                  </>
-                )}
-
-                {activeTab === 'payments' && (
-                  <>
-                    <div className="card-row">
-                      <span>Payment Method</span>
-                      <strong>{formatPaymentMethod(report.paymentMethod)}</strong>
-                    </div>
-                    <div className="card-row">
-                      <span>Transaction ID</span>
-                      <span>{report.transactionId || 'N/A'}</span>
-                    </div>
-                    <div className="card-row">
-                      <span>Paid Amount</span>
-                      <strong>{formatCurrency(report.totalAmount)}</strong>
-                    </div>
-                    <div className="card-row">
-                      <span>Payment Date</span>
-                      <span>{formatDate(report.paymentDate)}</span>
-                    </div>
-                  </>
-                )}
-
-                {activeTab === 'invoices' && (
-                  <>
-                    <div className="card-row">
-                      <span>Invoice Number</span>
-                      <strong>INV-{report.order?.orderNumber || report.orderNumber || report._id.slice(-6)}</strong>
-                    </div>
-                    <div className="card-row">
-                      <span>Order ID</span>
-                      <span>{report.order?.orderNumber || report.orderNumber || 'N/A'}</span>
-                    </div>
-                    <div className="card-row">
-                      <span>Invoice Date</span>
-                      <span>{formatDate(report.reportGeneratedAt)}</span>
-                    </div>
-                  </>
-                )}
-
-                {activeTab === 'reviews' && (
-                  <div className="empty-state">
-                    <p>No reviews available for this category yet</p>
-                    <small>Product reviews will appear here once submitted.</small>
-                  </div>
-                )}
-              </div>
-
-              <div className="card-actions">
-                <button
-                  type="button"
-                  className="card-btn"
-                  onClick={() => handleDownloadReport(report._id)}
-                >
-                  ⬇️ Download
-                </button>
-              </div>
+              {msg.isRead && msg.readAt && (
+                <div className="message-footer">
+                  <small className="read-timestamp">
+                    Read on {formatDate(msg.readAt)}
+                  </small>
+                </div>
+              )}
             </div>
           ))
         ) : (
           <div className="empty-state">
-            <p>No reports available for this category yet</p>
-            <small>Your generated reports will appear here.</small>
+            <div className="empty-icon">📭</div>
+            <h3>No Messages Yet</h3>
+            <p>Your report inbox is empty</p>
+            <small>Admin-sent report messages will appear here.</small>
           </div>
         )}
       </div>

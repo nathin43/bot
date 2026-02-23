@@ -14,6 +14,7 @@ const testReportsData = async () => {
       console.log('No users found in database');
       await mongoose.disconnect();
       return;
+      
     }
 
     console.log('\n=== Sample User ===');

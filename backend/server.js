@@ -3,6 +3,8 @@ const cors = require('cors');
 const dotenv = require('dotenv');
 const path = require('path');
 const net = require('net');
+const http = require('http');
+const { Server } = require('socket.io');
 const connectDB = require('./config/db');
 
 // Load environment variables
@@ -10,6 +12,18 @@ dotenv.config();
 
 // Initialize Express app
 const app = express();
+
+// Create HTTP server
+const httpServer = http.createServer(app);
+
+// Initialize Socket.IO with CORS
+const io = new Server(httpServer, {
+  cors: {
+    origin: ['http://localhost:3000', 'http://localhost:3001', 'http://localhost:3002', 'http://localhost:3003', 'http://localhost:5000', 'http://localhost:5173'],
+    methods: ['GET', 'POST'],
+    credentials: true
+  }
+});
 
 /**
  * Check if a port is available
@@ -61,7 +75,87 @@ app.use((req, res, next) => {
 // Serve static files for uploaded images
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-// Routes
+// ============================================
+// Socket.IO Event Handlers
+// ============================================
+const ReportMessage = require('./models/ReportMessage');
+
+io.on('connection', (socket) => {
+  const timestamp = new Date().toISOString().split('T')[1].split('.')[0];
+  console.log(`[${timestamp}] 🔌 Socket connected: ${socket.id}`);
+
+  // User joins their personal room to receive messages
+  socket.on('joinUserRoom', (userId) => {
+    if (userId) {
+      socket.join(userId);
+      console.log(`[${timestamp}] 👤 User ${userId} joined their room`);
+    }
+  });
+
+  // Admin sends a report message to a specific user
+  socket.on('sendReportMessage', async (data) => {
+    try {
+      const { userId, orderId, paymentId, invoiceId, title, message, status, sentBy } = data;
+
+      // Validate required fields
+      if (!userId || !title || !message || !sentBy) {
+        socket.emit('reportMessageError', { 
+          success: false, 
+          message: 'Missing required fields: userId, title, message, or sentBy' 
+        });
+        return;
+      }
+
+      // Create the report message in database
+      const reportMessage = await ReportMessage.create({
+        userId,
+        orderId: orderId || undefined,
+        paymentId: paymentId || undefined,
+        invoiceId: invoiceId || undefined,
+        title,
+        message,
+        status: status || 'Info',
+        sentBy,
+        isRead: false
+      });
+
+      // Populate user and admin references
+      await reportMessage.populate('userId', 'name email');
+      await reportMessage.populate('sentBy', 'name email');
+
+      console.log(`[${timestamp}] 📨 Report message sent to user ${userId}`);
+
+      // Send to the specific user's room (real-time delivery)
+      io.to(userId).emit('receiveReportMessage', {
+        success: true,
+        message: reportMessage
+      });
+
+      // Confirm to sender (admin)
+      socket.emit('reportMessageSent', {
+        success: true,
+        message: 'Report message sent successfully',
+        data: reportMessage
+      });
+
+    } catch (error) {
+      console.error(`[${timestamp}] ❌ Error sending report message:`, error.message);
+      socket.emit('reportMessageError', {
+        success: false,
+        message: error.message || 'Failed to send report message'
+      });
+    }
+  });
+
+  // Handle disconnection
+  socket.on('disconnect', () => {
+    console.log(`[${timestamp}] 🔌 Socket disconnected: ${socket.id}`);
+  });
+});
+
+// ============================================
+// REST API Routes
+// ============================================
 app.use('/api/auth', require('./routes/authRoutes'));
 app.use('/api/admin', require('./routes/adminRoutes'));
 app.use('/api/admin-management', require('./routes/adminManagementRoutes'));
@@ -175,10 +269,11 @@ const startServer = async () => {
       process.exit(1);
     }
     
-    server = app.listen(PORT, '127.0.0.1', () => {
+    server = httpServer.listen(PORT, '127.0.0.1', () => {
       console.log(`\n${'='.repeat(50)}`);
       console.log(`🚀 Server running on port ${PORT}`);
       console.log(`🌐 API URL: http://localhost:${PORT}`);
+      console.log(`🔌 WebSocket URL: ws://localhost:${PORT}`);
       console.log(`📝 Environment: ${process.env.NODE_ENV || 'development'}`);
       console.log(`📊 Database: ${dbConnected ? '✅ Connected' : '⚠️  Disconnected (mock mode)'}`);
       console.log(`🏥 Health check: http://localhost:${PORT}/api/health`);

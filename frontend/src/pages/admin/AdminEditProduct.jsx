@@ -183,28 +183,49 @@ const AdminEditProduct = () => {
 
   const fetchProduct = async () => {
     try {
+      setLoading(true);
       const { data } = await API.get(`/products/${id}`);
       const product = data.product;
 
-      console.log('Fetched product data:', product);
-      console.log('Product specifications:', product.specifications);
+      console.log('✅ Fetched product for editing:', {
+        id: product._id,
+        name: product.name,
+        category: product.category,
+        specificationsType: typeof product.specifications,
+        specifications: product.specifications,
+        specKeys: product.specifications ? Object.keys(product.specifications) : []
+      });
 
-      setFormData({
+      // Ensure specifications is always a proper object, never null/undefined
+      const specs = product.specifications && typeof product.specifications === 'object' 
+        ? product.specifications 
+        : {};
+
+      // Initialize form data with all product fields including specifications
+      const initialFormData = {
         name: product.name || '',
         description: product.description || '',
         price: product.price || '',
         category: product.category || categories[0],
         brand: product.brand || '',
         stock: product.stock || '',
-        specifications: product.specifications || {}
+        specifications: specs // This will preserve ALL stored specs
+      };
+
+      console.log('✅ Initializing form with data:', {
+        category: initialFormData.category,
+        specificationCount: Object.keys(initialFormData.specifications).length,
+        specifications: initialFormData.specifications
       });
+
+      setFormData(initialFormData);
       setPreview(product.image || '');
-      
-      console.log('Form data set with specifications:', product.specifications);
+      setError('');
     } catch (err) {
-      console.error('Error fetching product:', err);
-      setError('Product not found');
-      setTimeout(() => navigate('/admin/products'), 2000);
+      console.error('❌ Error fetching product:', err);
+      console.error('❌ Error response:', err.response?.data);
+      setError(err.response?.data?.message || 'Failed to load product. Product not found.');
+      setTimeout(() => navigate('/admin/products'), 3000);
     } finally {
       setLoading(false);
     }
@@ -213,10 +234,12 @@ const AdminEditProduct = () => {
   const handleChange = (e) => {
     const { name, value } = e.target;
     if (name === 'category') {
+      // DON'T reset specifications - preserve any stored specs when category changes
+      // This allows previously saved specs to remain if category is changed back
       setFormData(prev => ({
         ...prev,
-        category: value,
-        specifications: {} // Reset specifications when category changes
+        category: value
+        // Keep specifications intact - specs will auto-map to the new category's fields
       }));
       return;
     }
@@ -288,28 +311,25 @@ const AdminEditProduct = () => {
   const activeSpecConfig = specificationConfig[activeCategoryKey] || { required: [], optional: [] };
 
   const renderSpecField = (field, isRequired) => {
-    const value = formData.specifications[field.key] || '';
+    // Get value from specifications, ensuring proper type handling
+    const value = formData.specifications[field.key] !== undefined && formData.specifications[field.key] !== null
+      ? String(formData.specifications[field.key])
+      : '';
     
-    // Debug logging
-    if (process.env.NODE_ENV === 'development') {
-      console.log(`Rendering field ${field.key}:`, {
-        specValue: formData.specifications[field.key],
-        finalValue: value,
-        allSpecs: formData.specifications
-      });
-    }
+    const hasValue = value !== '';
     
     const commonProps = {
       name: field.key,
       value,
       onChange: (e) => handleSpecChange(field.key, e.target.value),
       required: isRequired,
-      placeholder: field.placeholder
+      placeholder: field.placeholder,
+      className: hasValue ? 'form-input has-value' : 'form-input'
     };
 
     if (field.type === 'select') {
       return (
-        <select {...commonProps} className="form-select">
+        <select {...commonProps} className={hasValue ? 'form-select has-value' : 'form-select'}>
           <option value="">Select {field.label}</option>
           {field.options.map(option => (
             <option key={option} value={option}>{option}</option>
@@ -323,7 +343,7 @@ const AdminEditProduct = () => {
         <textarea
           {...commonProps}
           rows={4}
-          className="form-textarea"
+          className={hasValue ? 'form-textarea has-value' : 'form-textarea'}
         />
       );
     }
@@ -332,7 +352,6 @@ const AdminEditProduct = () => {
       <input
         type={field.type || 'text'}
         {...commonProps}
-        className="form-input"
       />
     );
   };
@@ -365,6 +384,19 @@ const AdminEditProduct = () => {
           </button>
           <h1 className="page-title">Edit Product</h1>
           <p className="page-subtitle">Update product details and specifications</p>
+        </div>
+
+        {/* Auto-Fill Info Banner */}
+        <div className="alert-info">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <circle cx="12" cy="12" r="10"/>
+            <path d="M12 16v-4M12 8h.01"/>
+          </svg>
+          <div>
+            <strong>Auto-Fill Active:</strong> All previously saved data has been automatically loaded. 
+            Fields with blue highlighting contain existing data. Change the category to see different specifications 
+            while preserving any stored values.
+          </div>
         </div>
 
         {/* Error Alert */}

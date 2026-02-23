@@ -45,12 +45,8 @@ API.interceptors.request.use((config) => {
   else if (config.url.includes('/contact') && config.method.toLowerCase() !== 'post') {
     token = adminToken;
   }
-  // For /orders GET requests, prefer admin token if it exists (fetching all orders)
-  else if (config.url === '/orders' && config.method.toLowerCase() === 'get' && adminToken) {
-    token = adminToken;
-  }
-  // For /orders/:id/status PUT requests, use admin token
-  else if (config.url.match(/\/orders\/.*\/status/) && adminToken) {
+  // For /orders requests (with or without query params), prefer admin token if it exists
+  else if (config.url.startsWith('/orders') && adminToken) {
     token = adminToken;
   }
   // User routes or public routes - use user token
@@ -77,32 +73,35 @@ API.interceptors.response.use(
     return response;
   },
   (error) => {
-    console.log('API Error:', error.response?.status, error.response?.data?.message || error.message);
+    const url = error.config?.url || '';
+    const status = error.response?.status;
+    const message = error.response?.data?.message || '';
+    
+    console.log('API Error:', status, url, message);
 
-    // ONLY clear tokens on explicit authentication failures on LOGIN/MANAGEMENT routes
-    // Do NOT clear tokens on any other route (orders, products, etc.)
-    if (error.response?.status === 401) {
-      const url = error.config?.url || '';
-      const message = error.response?.data?.message || '';
-
-      // Only logout admin if trying to access admin login or management pages
-      // NOT on order/product/general API calls
-      if (url.includes('/auth/admin/login')) {
-        // Invalid admin credentials - stay on login page, don't force logout
+    // Handle 401/403 authentication errors
+    if (status === 401 || status === 403) {
+      // For admin routes, clear admin token and redirect
+      if (url.includes('/admin') || url.includes('/orders') || url.includes('/admin-management')) {
+        const adminToken = localStorage.getItem('adminToken');
+        if (adminToken && (status === 401 || message.includes('expired') || message.includes('invalid'))) {
+          console.warn('Admin authentication failed, clearing token');
+          localStorage.removeItem('adminToken');
+          localStorage.removeItem('admin');
+          // Don't redirect here - let components handle it to avoid loops
+        }
+      }
+      // For admin login failures, don't clear tokens
+      else if (url.includes('/auth/admin/login')) {
         console.log('Admin login failed - invalid credentials');
-      } else if (url.includes('/admin-management') && message === 'Access denied') {
-        // Admin trying to access restricted area - they may have lost access
-        localStorage.removeItem('adminToken');
-        localStorage.removeItem('admin');
-        window.location.href = '/admin/login';
-      } else if (url.includes('/auth') && url.includes('logout')) {
-        // Expected 401 on logout - clear tokens
+      }
+      // For logout, clear tokens
+      else if (url.includes('logout')) {
         localStorage.removeItem('adminToken');
         localStorage.removeItem('admin');
         localStorage.removeItem('token');
         localStorage.removeItem('user');
       }
-      // For all other routes (orders, products, etc.), do NOT clear tokens
     }
 
     return Promise.reject(error);
