@@ -30,7 +30,6 @@ import AdminManagement from './pages/admin/AdminManagement';
 import AdminReports from './pages/admin/AdminReports';
 import AdminContactMessages from './pages/admin/AdminContactMessages';
 import UserReportDetail from './pages/admin/UserReportDetailNew';
-import SendReportPage from './pages/admin/SendReportPage';
 
 // Admin Report Pages
 import SalesReport from './pages/admin/SalesReport';
@@ -89,7 +88,6 @@ function App() {
         <Route path="/admin/reports/payments" element={<AdminRoute><PaymentReport /></AdminRoute>} />
         <Route path="/admin/reports/orders" element={<AdminRoute><OrderReport /></AdminRoute>} />
         <Route path="/admin/reports/user/:userId" element={<AdminRoute><UserReportDetail /></AdminRoute>} />
-        <Route path="/admin/reports/send/:userId" element={<AdminRoute><SendReportPage /></AdminRoute>} />
         <Route path="/admin/contact-messages" element={<AdminRoute><AdminContactMessages /></AdminRoute>} />
         <Route path="/admin/admin-management" element={<MainAdminRoute><AdminManagement /></MainAdminRoute>} />
       </Routes>

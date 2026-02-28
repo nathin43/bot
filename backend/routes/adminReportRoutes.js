@@ -6,8 +6,6 @@ const {
   exportUsersCsv,
   exportUsersExcel,
   syncUserSummaryReports,
-  sendReportMessage,
-  getAllReportMessages,
   getSalesReport,
   getOrderReport,
   getPaymentReport,
@@ -54,10 +52,5 @@ router.post('/sync', adminProtect, syncUserSummaryReports);
 // Export users to Excel
 router.get('/export/csv', adminProtect, exportUsersCsv);
 router.get('/export/excel', adminProtect, exportUsersExcel);
-
-// Report Message Routes
-router.post('/send', adminProtect, sendReportMessage);
-router.post('/send-message', adminProtect, sendReportMessage); // Alternative route for consistency
-router.get('/messages', adminProtect, getAllReportMessages);
 
 module.exports = router;

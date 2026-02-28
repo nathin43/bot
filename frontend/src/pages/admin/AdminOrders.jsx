@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import AdminLayout from '../../components/AdminLayout';
 import API from '../../services/api';
-import SendReportMessage from './SendReportMessage';
 import './AdminOrders.css';
 
 /**
@@ -15,8 +14,6 @@ const AdminOrders = () => {
   const [dateFilter, setDateFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedOrders, setExpandedOrders] = useState({});
-  const [showSendMessageModal, setShowSendMessageModal] = useState(false);
-  const [selectedOrder, setSelectedOrder] = useState(null);
 
   useEffect(() => {
     fetchOrders();
@@ -70,16 +67,6 @@ const AdminOrders = () => {
       ...prev,
       [orderId]: !prev[orderId]
     }));
-  };
-
-  const handleSendReport = (order) => {
-    setSelectedOrder(order);
-    setShowSendMessageModal(true);
-  };
-
-  const handleCloseMessageModal = () => {
-    setShowSendMessageModal(false);
-    setSelectedOrder(null);
   };
 
   const filterOrders = () => {
@@ -376,12 +363,6 @@ const AdminOrders = () => {
                           </select>
                         </div>
                       )}
-                      <button 
-                        className="btn-action btn-send-report"
-                        onClick={() => handleSendReport(order)}
-                      >
-                        📨 Send Report
-                      </button>
                       <button className="btn-action">View Full Details</button>
                     </div>
                   </div>
@@ -395,16 +376,6 @@ const AdminOrders = () => {
           )}
         </div>
       </div>
-
-      {/* Send Report Message Modal */}
-      {showSendMessageModal && selectedOrder && (
-        <SendReportMessage
-          order={selectedOrder}
-          user={selectedOrder.user}
-          onSuccess={handleCloseMessageModal}
-          onCancel={handleCloseMessageModal}
-        />
-      )}
     </AdminLayout>
   );
 };
