@@ -130,9 +130,9 @@
   width: 96px;
   height: 96px;
   border-radius: 50%;
-  background: rgba(255,255,255,.14);
-  backdrop-filter: blur(12px);
-  border: 2.5px solid rgba(255,255,255,.3);
+  /* Same gradient as navbar logo pill — clearly visible on any background */
+  background: linear-gradient(135deg, #8B5CF6 0%, #3B82F6 100%);
+  border: 3px solid rgba(255,255,255,.85);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -143,24 +143,28 @@
   transition: var(--me-trans);
   user-select: none;
   box-shadow:
-    0 0 0 5px rgba(34,211,238,.15),
-    0 8px 32px rgba(0,0,0,.25);
+    0 0 0 5px rgba(139,92,246,.35),
+    0 8px 32px rgba(0,0,0,.3),
+    inset 0 1px 0 rgba(255,255,255,.25);
 }
 
 .pf-avatar:hover {
-  transform: scale(1.06);
+  transform: scale(1.07);
   box-shadow:
-    0 0 0 8px rgba(34,211,238,.22),
-    0 0 48px rgba(0,212,255,.18),
-    0 12px 40px rgba(0,0,0,.3);
+    0 0 0 8px rgba(139,92,246,.4),
+    0 0 40px rgba(139,92,246,.3),
+    0 12px 40px rgba(0,0,0,.35),
+    inset 0 1px 0 rgba(255,255,255,.3);
 }
 
 .pf-avatar__ring {
   position: absolute;
-  inset: -9px;
+  inset: -10px;
   border-radius: 50%;
-  border: 1.5px dashed rgba(34,211,238,.4);
-  animation: meSpin 20s linear infinite;
+  border: 2px solid rgba(255,255,255,.45);
+  border-top-color: rgba(139,92,246,.8);
+  border-right-color: rgba(59,130,246,.6);
+  animation: meSpin 8s linear infinite;
 }
 
 /* Hero text */
