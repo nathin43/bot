@@ -141,9 +141,13 @@ const Profile = () => {
 
       <div className="pf-page">
 
-        {/* ── Hero Card ── */}
+        {/* ── Hero Banner (matches site hero style) ── */}
         <div className="pf-hero">
-          <div className="pf-hero__bg-dots" />
+          {/* Floating orbs — same as Home hero */}
+          <div className="pf-hero__orb pf-hero__orb--1" />
+          <div className="pf-hero__orb pf-hero__orb--2" />
+          <div className="pf-hero__orb pf-hero__orb--3" />
+          <div className="pf-hero__grid-overlay" />
           <div className="pf-hero__content">
             <div className="pf-avatar">
               {getInitials(user?.name)}
@@ -247,7 +251,7 @@ const Profile = () => {
                 <p className="pf-section__sub">Keep your account secure with a strong password</p>
               </div>
               {!changingPassword && (
-                <button className="pf-btn pf-btn--outline pf-btn--sm" onClick={() => setChangingPassword(true)}>
+                <button className="pf-btn pf-btn--outline-white pf-btn--sm" onClick={() => setChangingPassword(true)}>
                   Change Password
                 </button>
               )}
