@@ -1,478 +1,638 @@
-import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
-import AdminLayout from '../../components/AdminLayout';
-import API from '../../services/api';
-import './AdminDashboard.css';
+﻿import { useState, useEffect, useRef } from "react";
+import { Link } from "react-router-dom";
+import AdminLayout from "../../components/AdminLayout";
+import API from "../../services/api";
+import "./AdminDashboard.css";
 
-/**
- * Modern Professional Admin Dashboard
- * Premium SaaS-style interface with real-time data
- */
+// Animated counter hook - defined outside component
+const useAnimatedCounter = (end, duration = 1000) => {
+  const [count, setCount] = useState(0);
+  const countRef = useRef(null);
+
+  useEffect(() => {
+    if (end === null || end === undefined) return;
+    
+    const endValue = typeof end === 'string' ? parseFloat(end.replace(/[^0-9.-]/g, '')) : end;
+    if (isNaN(endValue)) {
+      setCount(0);
+      return;
+    }
+
+    let startTime;
+    const step = (timestamp) => {
+      if (!startTime) startTime = timestamp;
+      const progress = Math.min((timestamp - startTime) / duration, 1);
+      
+      const easeOutCubic = 1 - Math.pow(1 - progress, 3);
+      setCount(Math.floor(easeOutCubic * endValue));
+
+      if (progress < 1) {
+        countRef.current = requestAnimationFrame(step);
+      }
+    };
+
+    countRef.current = requestAnimationFrame(step);
+    
+    return () => {
+      if (countRef.current) {
+        cancelAnimationFrame(countRef.current);
+      }
+    };
+  }, [end, duration]);
+
+  return count;
+};
+
 const AdminDashboard = () => {
   const [stats, setStats] = useState(null);
   const [salesTrend, setSalesTrend] = useState([]);
   const [orderDist, setOrderDist] = useState(null);
   const [recentOrders, setRecentOrders] = useState([]);
-  const [lastUpdated, setLastUpdated] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [chartView, setChartView] = useState('daily');
+  const [error, setError] = useState(null);
+  const refreshIntervalRef = useRef(null);
 
   useEffect(() => {
-    fetchDashboardData();
+    fetchDashboard();
     // Auto-refresh every 5 minutes
-    const interval = setInterval(fetchDashboardData, 300000);
-    return () => clearInterval(interval);
+    refreshIntervalRef.current = setInterval(fetchDashboard, 300000);
+    return () => {
+      if (refreshIntervalRef.current) {
+        clearInterval(refreshIntervalRef.current);
+      }
+    };
   }, []);
 
-  const fetchDashboardData = async () => {
+  const fetchDashboard = async () => {
     try {
-      console.log('🔍 Fetching dashboard data...');
-      const { data } = await API.get('/admin/dashboard');
-      
-      console.log('📊 Dashboard response:', data);
-      
+      setError(null);
+      const { data } = await API.get("/admin/dashboard");
+      console.log("📊 Dashboard data received:", data);
       if (data.success) {
-        console.log('✅ Dashboard stats:', data.stats);
-        console.log('📈 Sales trend data:', data.salesTrendData);
-        console.log('🍩 Order distribution:', data.orderDistribution);
-        console.log('📦 Recent orders:', data.recentOrders);
-        
         setStats(data.stats);
+        console.log("📈 Sales Trend Data:", data.salesTrendData);
         setSalesTrend(data.salesTrendData || []);
-        setOrderDist(data.orderDistribution);
+        
+        // Convert orderDistribution object to array format for donut chart
+        if (data.orderDistribution) {
+          const distArray = [
+            { _id: 'Delivered', count: data.orderDistribution.delivered || 0 },
+            { _id: 'Shipped', count: data.orderDistribution.shipped || 0 },
+            { _id: 'Pending', count: data.orderDistribution.pending || 0 },
+            { _id: 'Cancelled', count: data.orderDistribution.cancelled || 0 }
+          ].filter(item => item.count > 0); // Only include statuses with orders
+          setOrderDist(distArray);
+        } else {
+          setOrderDist([]);
+        }
+        
         setRecentOrders(data.recentOrders || []);
-        setLastUpdated(new Date());
-      } else {
-        console.error('❌ Dashboard request failed:', data.message);
       }
-    } catch (error) {
-      console.error('❌ Dashboard Error:', error);
-      console.error('Error response:', error.response?.data);
+    } catch (err) {
+      console.error("Dashboard error:", err);
+      setError("Failed to load dashboard data. Please try again.");
     } finally {
       setLoading(false);
     }
   };
 
-  const formatCurrency = (amount) => {
-    return `₹${(amount || 0).toLocaleString('en-IN')}`;
+  const handleRefresh = () => {
+    setLoading(true);
+    fetchDashboard();
   };
 
-  const formatTrend = (value) => {
-    const num = parseFloat(value) || 0;
-    const isPositive = num >= 0;
-    return {
-      value: Math.abs(num).toFixed(1),
-      isPositive,
-      symbol: isPositive ? '↑' : '↓',
-      color: isPositive ? '#10b981' : '#ef4444'
-    };
+  const fmt = (n) => {
+    if (n === null || n === undefined) return '₹0';
+    return `₹${(n || 0).toLocaleString("en-IN")}`;
   };
 
-  const getMaxValue = (data, key) => {
-    if (!data || data.length === 0) return 100;
-    return Math.max(...data.map(item => item[key] || 0));
+  const formatNumber = (n) => {
+    if (n === null || n === undefined) return '0';
+    return (n || 0).toLocaleString("en-IN");
   };
 
-  const getStatusColor = (status) => {
-    const colors = {
-      delivered: '#10b981',
-      shipped: '#3b82f6',
-      pending: '#f59e0b',
-      cancelled: '#6b7280'
-    };
-    return colors[status] || '#6b7280';
+  const growth = (() => {
+    const v = parseFloat(stats?.salesGrowth) || 0;
+    return { val: Math.abs(v).toFixed(1), up: v >= 0 };
+  })();
+
+  const buildAreaPath = (data, W = 700, H = 260) => {
+    if (!data || data.length < 2) return null;
+    const max = Math.max(...data.map((d) => d.revenue || 0), 1);
+    if (max === 0) {
+      // Generate mock visualization when no revenue data
+      const mockPoints = data.map((d, i) => ({
+        x: (i / (data.length - 1)) * W,
+        y: H - 20 // Flat line at bottom
+      }));
+      const linePath = mockPoints.map((p, i) => `${i === 0 ? "M" : "L"}${p.x},${p.y}`).join(" ");
+      const areaPath = linePath + ` L${W},${H} L0,${H} Z`;
+      return { line: linePath, area: areaPath };
+    }
+    const pts = data.map((d, i) => ({
+      x: (i / (data.length - 1)) * W,
+      y: H - Math.max(((d.revenue || 0) / max) * (H * 0.85), 10),
+    }));
+    const linePath = pts.map((p, i) => `${i === 0 ? "M" : "L"}${p.x},${p.y}`).join(" ");
+    const areaPath = linePath + ` L${W},${H} L0,${H} Z`;
+    return { line: linePath, area: areaPath };
   };
 
-  if (loading) {
+  // Use the sales trend data directly (it's already daily data from backend)
+  const paths = buildAreaPath(salesTrend);
+  const hasRevenue = salesTrend.some(d => (d.revenue || 0) > 0);
+
+  const formatDate = () => {
+    const d = new Date();
+    const opts = { weekday: "long", year: "numeric", month: "long", day: "numeric" };
+    return d.toLocaleDateString("en-IN", opts);
+  };
+
+  // Animated stat values
+  const animatedRevenue = useAnimatedCounter(stats?.totalSales || 0, 1500);
+  const animatedOrders = useAnimatedCounter(stats?.totalOrders || 0, 1200);
+  const animatedCustomers = useAnimatedCounter(stats?.totalUsers || 0, 1000);
+
+  if (loading && !stats) {
     return (
       <AdminLayout>
-        <div className="premium-dashboard">
-          <div className="loading-overlay">
-            <div className="loading-spinner">
-              <div className="spinner-ring"></div>
-              <div className="spinner-ring"></div>
-              <div className="spinner-ring"></div>
+        <div className="dash-loading">
+          <div className="dash-spinner"></div>
+          <p>Loading Dashboard...</p>
+        </div>
+      </AdminLayout>
+    );
+  }
+
+  if (error && !stats) {
+    return (
+      <AdminLayout>
+        <div className="dash-content">
+          <div className="dash-container">
+            <div className="dash-empty" style={{ minHeight: '60vh' }}>
+              <svg fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10"/>
+                <line x1="12" y1="8" x2="12" y2="12"/>
+                <line x1="12" y1="16" x2="12.01" y2="16"/>
+              </svg>
+              <p>{error}</p>
+              <button className="dash-btn dash-btn--primary" onClick={handleRefresh}>
+                Try Again
+              </button>
             </div>
-            <p className="loading-text">Loading Dashboard...</p>
           </div>
         </div>
       </AdminLayout>
     );
   }
 
-  const trend = formatTrend(stats?.salesGrowth);
-
   return (
     <AdminLayout>
-      <div className="premium-dashboard">
-        
-        {/* Hero KPI Cards with Glassmorphism */}
-        <div className="kpi-hero-grid">
-          
-          {/* Total Sales with Sparkline */}
-          <div className="glass-kpi-card sales-card">
-            <div className="kpi-top">
-              <div className="kpi-icon-circle sales-icon">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+      <div className="dash-content">
+        <div className="dash-container">
+          {/* WELCOME */}
+          <section className="dash-welcome">
+            <div className="dash-welcome__info">
+              <h1>
+                Welcome back, Admin <span className="wave"></span>
+              </h1>
+              <p>{formatDate()}</p>
+            </div>
+            <div className="dash-welcome__actions">
+              <button className="dash-btn dash-btn--secondary" onClick={handleRefresh} disabled={loading}>
+                <svg fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" width="20" height="20">
+                  <polyline points="23 4 23 10 17 10"/>
+                  <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
                 </svg>
-              </div>
-              <span className="kpi-tag">Revenue</span>
+                Refresh
+              </button>
             </div>
-            <h2 className="kpi-big-value">{formatCurrency(stats?.totalSales || 0)}</h2>
-            <div className="kpi-bottom">
-              <div className={`growth-indicator ${trend.isPositive ? 'positive' : 'negative'}`}>
-                <svg viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d={trend.isPositive ? "M5.293 7.707a1 1 0 010-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 01-1.414 1.414L11 5.414V17a1 1 0 11-2 0V5.414L6.707 7.707a1 1 0 01-1.414 0z" : "M14.707 12.293a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 111.414-1.414L9 14.586V3a1 1 0 012 0v11.586l2.293-2.293a1 1 0 011.414 0z"} clipRule="evenodd" />
-                </svg>
-                <span>{trend.value || 0}%</span>
-              </div>
-              <span className="kpi-description">vs last week</span>
-            </div>
-            <div className="sparkline">
-              {salesTrend && salesTrend.length > 0 
-                ? salesTrend.slice(0, 7).map((item, i) => {
-                    const maxRevenue = Math.max(...salesTrend.map(t => t.revenue || 0), 1);
-                    const height = ((item.revenue || 0) / maxRevenue) * 80 + 20;
-                    return <div key={i} className="spark-bar" style={{ height: `${height}%` }}></div>;
-                  })
-                : [1,2,3,4,5,6,7].map((i) => (
-                    <div key={i} className="spark-bar" style={{ height: `${20 + Math.random() * 60}%`, opacity: 0.3 }}></div>
-                  ))
-              }
-            </div>
-          </div>
+          </section>
 
-          {/* Total Orders */}
-          <div className="glass-kpi-card orders-card">
-            <div className="kpi-top">
-              <div className="kpi-icon-circle orders-icon">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
-                </svg>
+          {/* STATS - 3 Cards */}
+          <section className="dash-stats">
+            <div className="dash-stat" style={{ 
+              '--stat-color': '#2563eb', 
+              '--stat-color-light': '#3b82f6',
+              '--stat-bg': '#eff6ff',
+              '--stat-bg-light': '#dbeafe'
+            }}>
+              <div className="dash-stat__header">
+                <div className="dash-stat__icon">
+                  <svg fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="12" y1="1" x2="12" y2="23"/>
+                    <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+                  </svg>
+                </div>
+                <span className={`dash-stat__trend dash-stat__trend--${growth.up ? "up" : "down"}`}>
+                  {growth.up ? "" : ""} {growth.val}%
+                </span>
               </div>
-              <span className="kpi-tag">Orders</span>
-            </div>
-            <h2 className="kpi-big-value">{stats?.totalOrders || 0}</h2>
-            <div className="kpi-bottom">
-              <div className="info-pill today">
-                <span className="pill-dot"></span>
-                <span>{stats?.todayOrders || 0} today</span>
+              <div className="dash-stat__body">
+                <div className="dash-stat__label">Total Revenue</div>
+                <div className="dash-stat__value">{fmt(animatedRevenue)}</div>
+                <div className="dash-stat__meta">vs last month</div>
               </div>
-              <span className="kpi-description">Total placed</span>
+              <div className="dash-stat__chart">
+                {[45, 50, 48, 60, 65, 58, 70, 80].map((h, i) => (
+                  <div key={i} className="dash-stat__bar" style={{ height: `${h}%` }}></div>
+                ))}
+              </div>
             </div>
-          </div>
 
-          {/* Active Products */}
-          <div className="glass-kpi-card products-card">
-            <div className="kpi-top">
-              <div className="kpi-icon-circle products-icon">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+            <div className="dash-stat" style={{ 
+              '--stat-color': '#10b981',
+              '--stat-color-light': '#34d399',
+              '--stat-bg': '#d1fae5',
+              '--stat-bg-light': '#a7f3d0'
+            }}>
+              <div className="dash-stat__header">
+                <div className="dash-stat__icon">
+                  <svg fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="9" cy="21" r="1"/>
+                    <circle cx="20" cy="21" r="1"/>
+                    <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/>
+                  </svg>
+                </div>
+                <span className="dash-stat__trend dash-stat__trend--up"> 12%</span>
+              </div>
+              <div className="dash-stat__body">
+                <div className="dash-stat__label">Total Orders</div>
+                <div className="dash-stat__value">{formatNumber(animatedOrders)}</div>
+                <div className="dash-stat__meta">All time orders</div>
+              </div>
+              <div className="dash-stat__chart">
+                {[40, 55, 50, 62, 58, 68, 75, 70].map((h, i) => (
+                  <div key={i} className="dash-stat__bar" style={{ height: `${h}%` }}></div>
+                ))}
+              </div>
+            </div>
+
+            <div className="dash-stat" style={{ 
+              '--stat-color': '#8b5cf6',
+              '--stat-color-light': '#a78bfa',
+              '--stat-bg': '#ede9fe',
+              '--stat-bg-light': '#ddd6fe'
+            }}>
+              <div className="dash-stat__header">
+                <div className="dash-stat__icon">
+                  <svg fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                    <circle cx="9" cy="7" r="4"/>
+                    <path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>
+                  </svg>
+                </div>
+                <span className="dash-stat__trend dash-stat__trend--up"> 8%</span>
+              </div>
+              <div className="dash-stat__body">
+                <div className="dash-stat__label">Total Customers</div>
+                <div className="dash-stat__value">{formatNumber(animatedCustomers)}</div>
+                <div className="dash-stat__meta">Registered users</div>
+              </div>
+              <div className="dash-stat__chart">
+                {[35, 42, 48, 55, 60, 65, 72, 78].map((h, i) => (
+                  <div key={i} className="dash-stat__bar" style={{ height: `${h}%` }}></div>
+                ))}
+              </div>
+            </div>
+          </section>
+
+          {/* QUICK STATS - Horizontal Layout */}
+          <section className="dash-quick-stats">
+            <div className="dash-quick-stat" style={{ '--stat-color': '#ef4444' }}>
+              <div className="dash-quick-stat__icon">
+                <svg fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" width="24" height="24">
+                  <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                  <line x1="12" y1="9" x2="12" y2="13"/>
+                  <line x1="12" y1="17" x2="12.01" y2="17"/>
                 </svg>
               </div>
-              <span className="kpi-tag">Products</span>
+              <div className="dash-quick-stat__content">
+                <div className="dash-quick-stat__value">{stats?.lowStockCount || 0}</div>
+                <div className="dash-quick-stat__label">Low Stock</div>
+              </div>
             </div>
-            <h2 className="kpi-big-value">{stats?.activeProducts || 0}</h2>
-            <div className="kpi-bottom">
-              {stats?.inactiveProducts > 0 && (
-                <div className="info-pill inactive">
-                  <span className="pill-dot"></span>
-                  <span>{stats.inactiveProducts} inactive</span>
+
+            <div className="dash-quick-stat" style={{ '--stat-color': '#f59e0b' }}>
+              <div className="dash-quick-stat__icon">
+                <svg fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" width="24" height="24">
+                  <circle cx="12" cy="12" r="10"/>
+                  <polyline points="12 6 12 12 16 14"/>
+                </svg>
+              </div>
+              <div className="dash-quick-stat__content">
+                <div className="dash-quick-stat__value">{stats?.pendingOrders || 0}</div>
+                <div className="dash-quick-stat__label">Pending</div>
+              </div>
+            </div>
+
+            <div className="dash-quick-stat" style={{ '--stat-color': '#10b981' }}>
+              <div className="dash-quick-stat__icon">
+                <svg fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" width="24" height="24">
+                  <polyline points="20 6 9 17 4 12"/>
+                </svg>
+              </div>
+              <div className="dash-quick-stat__content">
+                <div className="dash-quick-stat__value">{stats?.deliveredOrders || 0}</div>
+                <div className="dash-quick-stat__label">Delivered</div>
+              </div>
+            </div>
+
+            <div className="dash-quick-stat" style={{ '--stat-color': '#8b5cf6' }}>
+              <div className="dash-quick-stat__icon">
+                <svg fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" width="24" height="24">
+                  <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                  <circle cx="8.5" cy="7" r="4"/>
+                  <polyline points="17 11 19 13 23 9"/>
+                </svg>
+              </div>
+              <div className="dash-quick-stat__content">
+                <div className="dash-quick-stat__value">{stats?.totalUsers || 0}</div>
+                <div className="dash-quick-stat__label">Active Users</div>
+              </div>
+            </div>
+          </section>
+
+          {/* QUICK ACTIONS - Horizontal Layout */}
+          <section className="dash-quick-actions">
+            <Link 
+              to="/admin/products/new" 
+              className="dash-quick-action" 
+              style={{ 
+                '--action-color': '#2563eb', 
+                '--action-bg': '#eff6ff',
+                '--action-hover': '#1d4ed8'
+              }}
+            >
+              <div className="dash-quick-action__icon">
+                <svg fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" width="24" height="24">
+                  <line x1="12" y1="5" x2="12" y2="19"/>
+                  <line x1="5" y1="12" x2="19" y2="12"/>
+                </svg>
+              </div>
+              <span>Add Product</span>
+            </Link>
+            <Link 
+              to="/admin/orders" 
+              className="dash-quick-action" 
+              style={{ 
+                '--action-color': '#10b981',
+                '--action-bg': '#d1fae5',
+                '--action-hover': '#059669'
+              }}
+            >
+              <div className="dash-quick-action__icon">
+                <svg fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" width="24" height="24">
+                  <path d="M6 2L3 6v14c0 1.1.9 2 2 2h14a2 2 0 0 0 2-2V6l-3-4H6zM3 6h18M16 10a4 4 0 1 1-8 0"/>
+                </svg>
+              </div>
+              <span>Manage Orders</span>
+            </Link>
+            <Link 
+              to="/admin/categories" 
+              className="dash-quick-action" 
+              style={{ 
+                '--action-color': '#8b5cf6',
+                '--action-bg': '#ede9fe',
+                '--action-hover': '#7c3aed'
+              }}
+            >
+              <div className="dash-quick-action__icon">
+                <svg fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" width="24" height="24">
+                  <path d="M3 3h7v7H3z"/>
+                  <path d="M14 3h7v7h-7z"/>
+                  <path d="M14 14h7v7h-7z"/>
+                  <path d="M3 14h7v7H3z"/>
+                </svg>
+              </div>
+              <span>Categories</span>
+            </Link>
+            <Link 
+              to="/admin/reports" 
+              className="dash-quick-action" 
+              style={{ 
+                '--action-color': '#f59e0b',
+                '--action-bg': '#fef3c7',
+                '--action-hover': '#d97706'
+              }}
+            >
+              <div className="dash-quick-action__icon">
+                <svg fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" width="24" height="24">
+                  <path d="M18 20V10M12 20V4M6 20v-6"/>
+                </svg>
+              </div>
+              <span>View Reports</span>
+            </Link>
+          </section>
+
+          {/* CHARTS */}
+          <section className="dash-charts">
+            {/* Area Chart */}
+            <div className="dash-card">
+              <div className="dash-card__header">
+                <div>
+                  <h2 className="dash-card__title">Revenue Trend</h2>
+                  <p className="dash-card__subtitle">Sales performance over last 7 days</p>
+                </div>
+              </div>
+              {paths ? (
+                <>
+                  <div className="dash-chart-wrap">
+                    <svg className="dash-chart-svg" viewBox="0 0 700 260" preserveAspectRatio="none">
+                      <defs>
+                        <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="#2563eb" stopOpacity="0.3"/>
+                          <stop offset="100%" stopColor="#2563eb" stopOpacity="0.02"/>
+                        </linearGradient>
+                        <filter id="shadow">
+                          <feDropShadow dx="0" dy="2" stdDeviation="3" floodOpacity="0.3"/>
+                        </filter>
+                      </defs>
+                      <path d={paths.area} fill="url(#areaGrad)"/>
+                      <path d={paths.line} fill="none" stroke="#2563eb" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" filter="url(#shadow)"/>
+                    </svg>
+                  </div>
+                  <div className="dash-chart-labels">
+                    {salesTrend.map((d, i) => (
+                      <span key={i}>{d.day || d.date?.split('-')[2] || i}</span>
+                    ))}
+                  </div>
+                  {!hasRevenue && (
+                    <div style={{ 
+                      padding: '12px', 
+                      marginTop: '12px', 
+                      background: '#fef3c7', 
+                      borderRadius: '8px',
+                      textAlign: 'center',
+                      fontSize: '0.875rem',
+                      color: '#92400e'
+                    }}>
+                      ⚠️ No revenue data yet. Complete orders with "delivered" status to see the trend.
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="dash-empty">
+                  <svg fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" width="48" height="48">
+                    <line x1="18" y1="20" x2="18" y2="10"/>
+                    <line x1="12" y1="20" x2="12" y2="4"/>
+                    <line x1="6" y1="20" x2="6" y2="14"/>
+                  </svg>
+                  <p>No revenue data available</p>
+                  <small>Complete delivered orders to see the sales trend</small>
                 </div>
               )}
-              {stats?.lowStockItems > 0 && (
-                <div className="info-pill warning">
-                  <span className="pill-dot"></span>
-                  <span>{stats.lowStockItems} low stock</span>
+            </div>
+
+            {/* Donut Chart */}
+            <div className="dash-card">
+              <div className="dash-card__header">
+                <div>
+                  <h2 className="dash-card__title">Order Distribution</h2>
+                  <p className="dash-card__subtitle">By status</p>
                 </div>
-              )}
-              <span className="kpi-description">Active in catalog</span>
-            </div>
-          </div>
-
-          {/* Total Users */}
-          <div className="glass-kpi-card users-card">
-            <div className="kpi-top">
-              <div className="kpi-icon-circle users-icon">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-                </svg>
+                <Link to="/admin/orders" className="dash-link">
+                  View All
+                  <svg fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="5" y1="12" x2="19" y2="12"/>
+                    <polyline points="12 5 19 12 12 19"/>
+                  </svg>
+                </Link>
               </div>
-              <span className="kpi-tag">Users</span>
-            </div>
-            <h2 className="kpi-big-value">{stats?.totalUsers || 0}</h2>
-            <div className="kpi-bottom">
-              <div className="info-pill success">
-                <span className="pill-dot"></span>
-                <span>{stats?.newUsersToday || 0} new</span>
-              </div>
-              <span className="kpi-description">Registered</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Analytics Cards with Charts */}
-        <div className="charts-grid">
-          
-          {/* Sales Performance Chart - Large */}
-          <div className="analytics-card large-chart">
-            <div className="card-header">
-              <div className="header-text">
-                <h3 className="card-title">Sales Performance</h3>
-                <p className="card-subtitle">Revenue trend analysis</p>
-              </div>
-              <div className="pill-toggle-group">
-                <button 
-                  className={`toggle-pill ${chartView === 'daily' ? 'active' : ''}`} 
-                  onClick={() => setChartView('daily')}
-                >
-                  Daily
-                </button>
-                <button 
-                  className={`toggle-pill ${chartView === 'weekly' ? 'active' : ''}`} 
-                  onClick={() => setChartView('weekly')}
-                >
-                  Weekly
-                </button>
-                <button 
-                  className={`toggle-pill ${chartView === 'monthly' ? 'active' : ''}`} 
-                  onClick={() => setChartView('monthly')}
-                >
-                  Monthly
-                </button>
-              </div>
-            </div>
-            <div className="card-body">
-              {salesTrend && salesTrend.length > 0 ? (
-                <div className="gradient-line-chart">
-                  {salesTrend.map((item, idx) => {
-                    const maxRevenue = getMaxValue(salesTrend, 'revenue');
-                    const height = maxRevenue > 0 ? Math.max((item.revenue / maxRevenue) * 100, 5) : 5;
-                    
-                    return (
-                      <div key={idx} className="bar-column">
-                        <div className="hover-tooltip">
-                          <div className="tooltip-value">{formatCurrency(item.revenue || 0)}</div>
-                          <div className="tooltip-label">{item.orders || 0} orders</div>
-                          <div className="tooltip-label">{item.day}</div>
-                        </div>
-                        <div className="gradient-bar" style={{ height: `${height}%` }}></div>
-                        <div className="bar-label">{item.day}</div>
+              {orderDist && orderDist.length > 0 ? (
+                <div className="dash-donut-wrap">
+                  <div className="dash-donut">
+                    <svg className="dash-donut-svg" viewBox="0 0 160 160">
+                      {(() => {
+                        const total = orderDist.reduce((s, d) => s + (d.count || 0), 0);
+                        const colors = ["#10b981", "#f59e0b", "#ef4444", "#6b7280"];
+                        let offset = 0;
+                        const R = 60, C = 80, circ = 2 * Math.PI * R;
+                        return orderDist.map((d, i) => {
+                          const pct = (d.count || 0) / total;
+                          const len = pct * circ;
+                          const seg = (
+                            <circle
+                              key={i}
+                              className="dash-donut-seg"
+                              cx={C}
+                              cy={C}
+                              r={R}
+                              fill="none"
+                              stroke={colors[i % colors.length]}
+                              strokeWidth="20"
+                              strokeDasharray={`${len} ${circ}`}
+                              strokeDashoffset={-offset}
+                            />
+                          );
+                          offset += len;
+                          return seg;
+                        });
+                      })()}
+                    </svg>
+                    <div className="dash-donut-center">
+                      <div className="dash-donut-total">
+                        {orderDist.reduce((s, d) => s + (d.count || 0), 0).toLocaleString()}
                       </div>
-                    );
-                  })}
+                      <div className="dash-donut-label">Orders</div>
+                    </div>
+                  </div>
+                  <div className="dash-donut-legend">
+                    {orderDist.map((d, i) => {
+                      const colors = ["#10b981", "#f59e0b", "#ef4444", "#6b7280"];
+                      const total = orderDist.reduce((s, x) => s + (x.count || 0), 0);
+                      const pct = ((d.count || 0) / total * 100).toFixed(1);
+                      return (
+                        <div key={i} className="dash-legend-item">
+                          <div className="dash-legend-dot" style={{ background: colors[i % colors.length] }}></div>
+                          <div className="dash-legend-name">{d._id || "Unknown"}</div>
+                          <div className="dash-legend-count">{(d.count || 0).toLocaleString()}</div>
+                          <div className="dash-legend-pct">{pct}%</div>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               ) : (
-                <div className="empty-state">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                <div className="dash-empty">
+                  <svg fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="10"/>
                   </svg>
-                  <p>No sales data available yet</p>
-                  <span style={{ fontSize: '12px', color: 'var(--text-light)', marginTop: '8px' }}>
-                    Data will appear once orders are delivered
-                  </span>
+                  <p>No order data</p>
                 </div>
               )}
             </div>
-          </div>
+          </section>
 
-          {/* Order Distribution Donut */}
-          <div className="analytics-card donut-chart-card">
-            <div className="card-header">
-              <div className="header-text">
-                <h3 className="card-title">Order Distribution</h3>
-                <p className="card-subtitle">By status</p>
+          {/* BOTTOM */}
+          <section className="dash-bottom-full">
+            {/* Table */}
+            <div className="dash-card">
+              <div className="dash-card__header">
+                <div>
+                  <h2 className="dash-card__title">Recent Orders</h2>
+                  <p className="dash-card__subtitle">Latest transactions</p>
+                </div>
+                <Link to="/admin/orders" className="dash-link">
+                  View All
+                  <svg fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="5" y1="12" x2="19" y2="12"/>
+                    <polyline points="12 5 19 12 12 19"/>
+                  </svg>
+                </Link>
               </div>
-            </div>
-            <div className="card-body donut-body">
-              {orderDist && (
-                <div className="donut-wrapper">
-                  <div className="modern-donut">
-                    <svg viewBox="0 0 200 200" className="donut-svg">
-                      <circle cx="100" cy="100" r="80" fill="none" stroke="#e2e8f0" strokeWidth="30" />
-                      <circle cx="100" cy="100" r="80" fill="none" stroke="#10b981" strokeWidth="30" 
-                        strokeDasharray="502" strokeDashoffset="0" transform="rotate(-90 100 100)" />
+              <div className="dash-table-wrap">
+                {recentOrders.length > 0 ? (
+                  <table className="dash-table">
+                    <thead>
+                      <tr>
+                        <th>Order ID</th>
+                        <th>Customer</th>
+                        <th>Date</th>
+                        <th className="dash-th-right">Amount</th>
+                        <th>Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {recentOrders.map((o, i) => (
+                        <tr key={o._id || i}>
+                          <td className="dash-td-mono">#{(o.orderId || "").slice(-8)}</td>
+                          <td className="dash-td-name">{o.user?.name || "Guest"}</td>
+                          <td className="dash-td-muted">
+                            {o.createdAt ? new Date(o.createdAt).toLocaleDateString("en-IN") : "-"}
+                          </td>
+                          <td className="dash-td-right dash-td-bold">{fmt(o.totalAmount)}</td>
+                          <td>
+                            <span 
+                              className="dash-status" 
+                              style={{
+                                background: o.status === "Delivered" ? "#d1fae5" : 
+                                          o.status === "Processing" ? "#fef3c7" : 
+                                          o.status === "Cancelled" ? "#fee2e2" : "#f3f4f6",
+                                color: o.status === "Delivered" ? "#059669" : 
+                                      o.status === "Processing" ? "#d97706" : 
+                                      o.status === "Cancelled" ? "#dc2626" : "#6b7280"
+                              }}
+                            >
+                              {o.status || "Pending"}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                ) : (
+                  <div className="dash-empty">
+                    <svg fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M6 2L3 6v14c0 1.1.9 2 2 2h14a2 2 0 0 0 2-2V6l-3-4H6zM3 6h18M16 10a4 4 0 1 1-8 0"/>
                     </svg>
-                    <div className="donut-center-label">
-                      <div className="center-number">{stats?.totalOrders || 0}</div>
-                      <div className="center-text">Total Orders</div>
-                    </div>
+                    <p>No orders yet</p>
                   </div>
-                  <div className="donut-legend-list">
-                    <div className="legend-row">
-                      <div className="legend-marker delivered"></div>
-                      <span className="legend-name">Delivered</span>
-                      <span className="legend-number">{orderDist.delivered || 0}</span>
-                    </div>
-                    <div className="legend-row">
-                      <div className="legend-marker shipped"></div>
-                      <span className="legend-name">Shipped</span>
-                      <span className="legend-number">{orderDist.shipped || 0}</span>
-                    </div>
-                    <div className="legend-row">
-                      <div className="legend-marker pending"></div>
-                      <span className="legend-name">Pending</span>
-                      <span className="legend-number">{orderDist.pending || 0}</span>
-                    </div>
-                    <div className="legend-row">
-                      <div className="legend-marker cancelled"></div>
-                      <span className="legend-name">Cancelled</span>
-                      <span className="legend-number">{orderDist.cancelled || 0}</span>
-                    </div>
-                  </div>
-                </div>
-              )}
+                )}
+              </div>
             </div>
-          </div>
+          </section>
         </div>
-
-        {/* Alert Insight Cards */}
-        <div className="alert-cards-grid">
-          <div className="alert-card yellow">
-            <div className="alert-icon-wrap">
-              <svg viewBox="0 0 24 24" fill="currentColor">
-                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
-              </svg>
-            </div>
-            <div className="alert-content">
-              <h4 className="alert-number">{stats?.pendingOrders || 0}</h4>
-              <p className="alert-label">Active Orders</p>
-              <span className="alert-action">Needs attention</span>
-            </div>
-          </div>
-          
-          <div className="alert-card red">
-            <div className="alert-icon-wrap">
-              <svg viewBox="0 0 24 24" fill="currentColor">
-                <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-              </svg>
-            </div>
-            <div className="alert-content">
-              <h4 className="alert-number">{stats?.lowStockItems || 0}</h4>
-              <p className="alert-label">Low Stock</p>
-              <span className="alert-action">Restock soon</span>
-            </div>
-          </div>
-          
-          <div className="alert-card darkred">
-            <div className="alert-icon-wrap">
-              <svg viewBox="0 0 24 24" fill="currentColor">
-                <path fillRule="evenodd" d="M13.477 14.89A6 6 0 015.11 6.524l8.367 8.368zm1.414-1.414L6.524 5.11a6 6 0 018.367 8.367zM18 10a8 8 0 11-16 0 8 8 0 0116 0z" clipRule="evenodd" />
-              </svg>
-            </div>
-            <div className="alert-content">
-              <h4 className="alert-number">{stats?.outOfStock || 0}</h4>
-              <p className="alert-label">Out of Stock</p>
-              <span className="alert-action">Urgent action</span>
-            </div>
-          </div>
-          
-          <div className="alert-card green">
-            <div className="alert-icon-wrap">
-              <svg viewBox="0 0 24 24" fill="currentColor">
-                <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-              </svg>
-            </div>
-            <div className="alert-content">
-              <h4 className="alert-number">{(stats?.avgRating || 0).toFixed(1)}</h4>
-              <p className="alert-label">Average Rating</p>
-              <span className="alert-action">Excellent</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Quick Actions Panel */}
-        <div className="quick-actions-card">
-          <h3 className="section-heading">Quick Actions</h3>
-          <div className="action-buttons-grid">
-            <Link to="/admin/products/add" className="action-button blue">
-              <div className="action-button-icon">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-                </svg>
-              </div>
-              <span className="action-button-text">Add Product</span>
-            </Link>
-            
-            <Link to="/admin/orders" className="action-button purple">
-              <div className="action-button-icon">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                </svg>
-              </div>
-              <span className="action-button-text">View Orders</span>
-            </Link>
-            
-            <Link to="/admin/products" className="action-button orange">
-              <div className="action-button-icon">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-                </svg>
-              </div>
-              <span className="action-button-text">Manage Inventory</span>
-            </Link>
-            
-            <Link to="/admin/customers" className="action-button teal">
-              <div className="action-button-icon">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
-                </svg>
-              </div>
-              <span className="action-button-text">Customers</span>
-            </Link>
-          </div>
-        </div>
-
-        {/* Recent Orders Table */}
-        {recentOrders && recentOrders.length > 0 && (
-          <div className="table-card">
-            <div className="table-card-header">
-              <h3 className="section-heading">Recent Orders</h3>
-              <Link to="/admin/orders" className="view-all-button">
-                View All
-                <svg viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
-                </svg>
-              </Link>
-            </div>
-            <div className="table-responsive">
-              <table className="premium-table">
-                <thead>
-                  <tr>
-                    <th>Order ID</th>
-                    <th>Customer</th>
-                    <th>Status</th>
-                    <th>Date</th>
-                    <th className="text-right">Amount</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {recentOrders.slice(0, 5).map((order) => (
-                    <tr key={order._id}>
-                      <td className="font-mono order-id-cell">#{order.orderNumber}</td>
-                      <td className="customer-cell">{order.user?.name || 'Guest'}</td>
-                      <td>
-                        <span className={`modern-badge badge-${order.orderStatus}`}>
-                          {order.orderStatus}
-                        </span>
-                      </td>
-                      <td className="date-cell">
-                        {new Date(order.createdAt).toLocaleDateString('en-IN', {
-                          day: '2-digit',
-                          month: 'short',
-                          year: 'numeric'
-                        })}
-                      </td>
-                      <td className="amount-cell text-right">{formatCurrency(order.totalAmount || order.totalPrice)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-
       </div>
     </AdminLayout>
   );

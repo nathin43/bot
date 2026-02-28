@@ -277,12 +277,13 @@
 
 /* Dark navy header — security section */
 .pf-section__header--dark {
-  background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+  background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 60%, #4f46e5 100%);
   border-bottom: none;
+  box-shadow: inset 0 -1px 0 rgba(255,255,255,.08);
 }
 
 .pf-section__header--dark .pf-section__title { color: #fff; }
-.pf-section__header--dark .pf-section__sub   { color: rgba(255,255,255,.5); }
+.pf-section__header--dark .pf-section__sub   { color: rgba(255,255,255,.72); }
 
 /* Icon wraps */
 .pf-section__icon-wrap {
@@ -299,9 +300,9 @@
 }
 
 .pf-section__icon-wrap--dark {
-  background: rgba(255,255,255,.1);
+  background: rgba(255,255,255,.18);
   backdrop-filter: blur(8px);
-  box-shadow: 0 0 0 1px rgba(255,255,255,.12);
+  box-shadow: 0 0 0 1px rgba(255,255,255,.25), 0 4px 12px rgba(0,0,0,.15);
 }
 
 .pf-section__icon-wrap--danger {
@@ -531,17 +532,17 @@
 
 /* Dark section outline — white border */
 .pf-btn--outline-white {
-  background: transparent;
-  border: 2px solid rgba(255,255,255,.3);
-  color: rgba(255,255,255,.9);
+  background: rgba(255,255,255,.15);
+  border: 2px solid rgba(255,255,255,.6);
+  color: #fff;
   backdrop-filter: blur(6px);
 }
 .pf-btn--outline-white:hover {
-  background: rgba(255,255,255,.12);
-  border-color: rgba(255,255,255,.55);
+  background: rgba(255,255,255,.28);
+  border-color: #fff;
   color: #fff;
   transform: translateY(-1px);
-  box-shadow: 0 0 20px rgba(34,211,238,.15);
+  box-shadow: 0 4px 20px rgba(0,0,0,.2), 0 0 16px rgba(255,255,255,.15);
 }
 
 .pf-btn--sm { padding: 9px 18px; font-size: 13px; }

@@ -3,254 +3,259 @@ import AdminLayout from '../../components/AdminLayout';
 import API from '../../services/api';
 import './AdminCustomers.css';
 
-/**
- * Admin Customers Page
- * View and manage customers
- */
+const getInitials = (name) =>
+  name.split(' ').map(p => p[0]).join('').toUpperCase().slice(0, 2);
+
+const getAvatarGradient = (name) => {
+  const g = [
+    'linear-gradient(135deg,#8b5cf6,#3b82f6)',
+    'linear-gradient(135deg,#1e3a8a,#2563eb)',
+    'linear-gradient(135deg,#0891b2,#06b6d4)',
+    'linear-gradient(135deg,#059669,#10b981)',
+    'linear-gradient(135deg,#7c3aed,#8b5cf6)',
+    'linear-gradient(135deg,#1d4ed8,#3b82f6)',
+  ];
+  return g[name.charCodeAt(0) % g.length];
+};
+
+const getStatusColor = (status) => {
+  const m = { pending:'warning', confirmed:'info', processing:'info',
+    shipped:'primary', delivered:'success', cancelled:'danger' };
+  return m[status] || 'primary';
+};
+
+const fmtDate = (d) =>
+  new Date(d).toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'numeric' });
+
 const AdminCustomers = () => {
   const [customers, setCustomers] = useState([]);
   const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [customerOrders, setCustomerOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const [sortBy, setSortBy] = useState('newest'); // newest, oldest, name
+  const [sortBy, setSortBy] = useState('newest');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
 
-  // Disable body scroll when modal is open
   useEffect(() => {
-    if (selectedCustomer) {
-      document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = 'unset';
-    }
-
-    return () => {
-      document.body.style.overflow = 'unset';
-    };
+    document.body.style.overflow = selectedCustomer ? 'hidden' : 'unset';
+    return () => { document.body.style.overflow = 'unset'; };
   }, [selectedCustomer]);
 
-  useEffect(() => {
-    fetchCustomers();
-  }, []);
+  useEffect(() => { fetchCustomers(); }, []);
 
   const fetchCustomers = async () => {
     try {
       const { data } = await API.get('/admin/customers');
       setCustomers(data.customers);
-    } catch (error) {
-      console.error('Error fetching customers:', error);
+    } catch (e) {
+      console.error('Error fetching customers:', e);
     } finally {
       setLoading(false);
     }
   };
 
-  const fetchCustomerDetails = async (customerId) => {
+  const fetchCustomerDetails = async (id) => {
     try {
-      const { data } = await API.get(`/admin/customers/${customerId}`);
+      const { data } = await API.get(`/admin/customers/${id}`);
       setSelectedCustomer(data.customer);
       setCustomerOrders(data.orders);
-    } catch (error) {
-      alert('Failed to fetch customer details');
-    }
+    } catch { alert('Failed to fetch customer details'); }
   };
 
   const handleDelete = async (id, name) => {
-    if (!window.confirm(`Are you sure you want to delete customer "${name}"?`)) {
-      return;
-    }
-
+    if (!window.confirm(`Delete customer "${name}"?`)) return;
     try {
       await API.delete(`/admin/customers/${id}`);
-      alert('Customer deleted successfully');
       fetchCustomers();
-      if (selectedCustomer?._id === id) {
-        setSelectedCustomer(null);
-        setCustomerOrders([]);
-      }
-    } catch (error) {
-      alert(error.response?.data?.message || 'Failed to delete customer');
+      if (selectedCustomer?._id === id) { setSelectedCustomer(null); setCustomerOrders([]); }
+    } catch (e) {
+      alert(e.response?.data?.message || 'Failed to delete customer');
     }
   };
+
+  const filteredCustomers = customers
+    .filter(c =>
+      c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      c.email.toLowerCase().includes(searchQuery.toLowerCase())
+    )
+    .sort((a, b) => {
+      if (sortBy === 'newest') return new Date(b.createdAt) - new Date(a.createdAt);
+      if (sortBy === 'oldest') return new Date(a.createdAt) - new Date(b.createdAt);
+      if (sortBy === 'name')   return a.name.localeCompare(b.name);
+      return 0;
+    });
+
+  const totalPages        = Math.ceil(filteredCustomers.length / itemsPerPage);
+  const paginatedCustomers = filteredCustomers.slice(
+    (currentPage - 1) * itemsPerPage, currentPage * itemsPerPage
+  );
+
+  // Stat helpers
+  const now = new Date();
+  const thisMonth = customers.filter(c => {
+    const d = new Date(c.createdAt);
+    return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+  }).length;
+  const lastMonth = customers.filter(c => {
+    const d = new Date(c.createdAt);
+    const lm = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    return d.getMonth() === lm.getMonth() && d.getFullYear() === lm.getFullYear();
+  }).length;
+  const growthRaw  = lastMonth > 0 ? (((thisMonth - lastMonth) / lastMonth) * 100).toFixed(1) : null;
+  const growthStr  = growthRaw !== null ? `${Number(growthRaw) > 0 ? '+' : ''}${growthRaw}%` : '—';
+  const growthColor = growthRaw !== null && Number(growthRaw) < 0 ? 'red' : 'green';
 
   if (loading) {
     return (
       <AdminLayout>
-        <div className="spinner"></div>
+        <div className="ac-loading">
+          <div className="ac-spinner" />
+          <span>Loading customers…</span>
+        </div>
       </AdminLayout>
     );
   }
 
-  // Filter and sort customers
-  const filteredCustomers = customers
-    .filter(customer =>
-      customer.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      customer.email.toLowerCase().includes(searchQuery.toLowerCase())
-    )
-    .sort((a, b) => {
-      if (sortBy === 'newest') {
-        return new Date(b.createdAt) - new Date(a.createdAt);
-      } else if (sortBy === 'oldest') {
-        return new Date(a.createdAt) - new Date(b.createdAt);
-      } else if (sortBy === 'name') {
-        return a.name.localeCompare(b.name);
-      }
-      return 0;
-    });
-
-  // Pagination
-  const totalPages = Math.ceil(filteredCustomers.length / itemsPerPage);
-  const startIdx = (currentPage - 1) * itemsPerPage;
-  const paginatedCustomers = filteredCustomers.slice(startIdx, startIdx + itemsPerPage);
-
-  // Generate customer initials
-  const getInitials = (name) => {
-    return name
-      .split(' ')
-      .map(part => part[0])
-      .join('')
-      .toUpperCase()
-      .slice(0, 2);
-  };
-
-  // Get avatar color based on name
-  const getAvatarColor = (name) => {
-    const colors = ['#4279a3', '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
-    const charCode = name.charCodeAt(0);
-    return colors[charCode % colors.length];
-  };
-
   return (
     <AdminLayout>
-      <div className="admin-customers">
-        {/* Modern Header Section */}
-        <div className="customers-header">
-          <div className="header-gradient">
-            <div className="header-content">
-              <div className="header-text">
-                <h1>Customers</h1>
-                <p className="header-subtitle">Manage and view all registered customers</p>
-              </div>
-              <div className="stats-card">
-                <div className="stats-icon">
-                  <span className="icon-emoji">👥</span>
-                </div>
-                <div className="stats-info">
-                  <div className="stats-label">Total Customers</div>
-                  <div className="stats-value">{customers.length}</div>
-                </div>
-              </div>
+      <div className="ac-page">
+
+        {/* ── Page Header ── */}
+        <div className="ac-header">
+          <div className="ac-header__left">
+            <div className="ac-header__icon">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
+                <path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+              </svg>
+            </div>
+            <div>
+              <h1 className="ac-header__title">Customers</h1>
+              <p className="ac-header__sub">Manage and monitor all registered users</p>
             </div>
           </div>
+          <div className="ac-header__badge">{customers.length} Total</div>
         </div>
 
-        {/* Modern Search & Filter Toolbar */}
-        <div className="customers-toolbar">
-          <div className="search-container">
-            <svg className="search-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <circle cx="11" cy="11" r="8"></circle>
-              <path d="m21 21-4.35-4.35"></path>
+        {/* ── Stat Cards ── */}
+        <div className="ac-stats">
+          {[
+            { label:'Total Customers', value: customers.length,    icon:'👥', color:'blue',
+              sub:'All registered users' },
+            { label:'New This Month',  value: thisMonth,           icon:'🆕', color:'purple',
+              sub:'Joined in current month' },
+            { label:'Last Month',      value: lastMonth,           icon:'📅', color:'teal',
+              sub:'Joined previous month' },
+            { label:'Monthly Growth',  value: growthStr,           icon:'📈', color: growthColor,
+              sub:'vs previous month' },
+          ].map((s, i) => (
+            <div className={`ac-stat ac-stat--${s.color}`} key={i} style={{ animationDelay:`${i*0.07}s` }}>
+              <div className="ac-stat__icon">{s.icon}</div>
+              <div className="ac-stat__body">
+                <div className="ac-stat__value">{s.value}</div>
+                <div className="ac-stat__label">{s.label}</div>
+                <div className="ac-stat__sub">{s.sub}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* ── Toolbar ── */}
+        <div className="ac-toolbar">
+          <div className="ac-search">
+            <svg className="ac-search__icon" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+              <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
             </svg>
             <input
+              className="ac-search__input"
               type="text"
-              placeholder="Search customers by name or email..."
+              placeholder="Search by name or email…"
               value={searchQuery}
-              onChange={(e) => {
-                setSearchQuery(e.target.value);
-                setCurrentPage(1);
-              }}
-              className="search-input"
+              onChange={e => { setSearchQuery(e.target.value); setCurrentPage(1); }}
             />
+            {searchQuery && (
+              <button className="ac-search__clear" onClick={() => setSearchQuery('')}>✕</button>
+            )}
           </div>
-          
-          <div className="toolbar-actions">
-            <select 
-              className="filter-select"
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value)}
-            >
+          <div className="ac-toolbar__right">
+            <select className="ac-select" value={sortBy} onChange={e => setSortBy(e.target.value)}>
               <option value="newest">Newest First</option>
               <option value="oldest">Oldest First</option>
-              <option value="name">Name (A-Z)</option>
+              <option value="name">Name (A–Z)</option>
             </select>
-            
-            <div className="customer-count">
-              <span className="count-number">{filteredCustomers.length}</span>
-              <span className="count-label">Customers</span>
+            <div className="ac-count">
+              <span className="ac-count__num">{filteredCustomers.length}</span>
+              <span className="ac-count__label">results</span>
             </div>
           </div>
         </div>
 
-        {/* Table Card */}
-        <div className="table-card">
-          <table className="customers-table">
+        {/* ── Table ── */}
+        <div className="ac-table-wrap">
+          <table className="ac-table">
             <thead>
               <tr>
                 <th>Customer</th>
-                <th>Email</th>
-                <th className="text-center">Phone</th>
-                <th className="text-center">Joined</th>
-                <th>Address</th>
-                <th className="text-center">Actions</th>
+                <th>Contact</th>
+                <th>Location</th>
+                <th>Joined</th>
+                <th className="ac-th--center">Status</th>
+                <th className="ac-th--center">Actions</th>
               </tr>
             </thead>
             <tbody>
-              {paginatedCustomers.length > 0 ? (
-                paginatedCustomers.map((customer, idx) => (
-                  <tr key={customer._id} className={idx % 2 === 0 ? 'even-row' : ''}>
-                    <td>
-                      <div className="customer-name-cell">
-                        <div 
-                          className="avatar"
-                          style={{ backgroundColor: getAvatarColor(customer.name) }}
-                        >
-                          {getInitials(customer.name)}
-                        </div>
-                        <span className="customer-name">{customer.name}</span>
+              {paginatedCustomers.length > 0 ? paginatedCustomers.map((c, i) => (
+                <tr key={c._id} className="ac-row" style={{ animationDelay:`${i*0.04}s` }}>
+                  <td>
+                    <div className="ac-customer-cell">
+                      <div className="ac-avatar" style={{ background: getAvatarGradient(c.name) }}>
+                        {getInitials(c.name)}
                       </div>
-                    </td>
-                    <td className="email-cell">{customer.email}</td>
-                    <td className="text-center">{customer.phone || '—'}</td>
-                    <td className="text-center date-cell">
-                      {new Date(customer.createdAt).toLocaleDateString()}
-                    </td>
-                    <td className="address-cell">
-                      {customer.address?.city || customer.address?.state ? (
-                        `${customer.address?.city || ''}${customer.address?.city && customer.address?.state ? ', ' : ''}${customer.address?.state || ''}`
-                      ) : '—'}
-                    </td>
-                    <td className="text-center">
-                      <div className="action-buttons">
-                        <button
-                          onClick={() => fetchCustomerDetails(customer._id)}
-                          className="btn-icon btn-view"
-                          title="View Details"
-                        >
-                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-                            <circle cx="12" cy="12" r="3"></circle>
-                          </svg>
-                        </button>
-                        <button
-                          onClick={() => handleDelete(customer._id, customer.name)}
-                          className="btn-icon btn-delete"
-                          title="Delete Customer"
-                        >
-                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                            <polyline points="3 6 5 6 21 6"></polyline>
-                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                            <line x1="10" y1="11" x2="10" y2="17"></line>
-                            <line x1="14" y1="11" x2="14" y2="17"></line>
-                          </svg>
-                        </button>
+                      <div className="ac-customer-info">
+                        <span className="ac-customer-name">{c.name}</span>
+                        <span className="ac-customer-id">ID: {c._id.slice(-6).toUpperCase()}</span>
                       </div>
-                    </td>
-                  </tr>
-                ))
-              ) : (
+                    </div>
+                  </td>
+                  <td>
+                    <div className="ac-contact-cell">
+                      <span className="ac-email">{c.email}</span>
+                      <span className="ac-phone">{c.phone || '—'}</span>
+                    </div>
+                  </td>
+                  <td className="ac-location">
+                    {c.address?.city && c.address?.state
+                      ? `${c.address.city}, ${c.address.state}`
+                      : c.address?.city || c.address?.state || '—'}
+                  </td>
+                  <td className="ac-date">{fmtDate(c.createdAt)}</td>
+                  <td className="ac-th--center">
+                    <span className="ac-badge ac-badge--active">Active</span>
+                  </td>
+                  <td className="ac-th--center">
+                    <div className="ac-actions">
+                      <button className="ac-btn ac-btn--view" onClick={() => fetchCustomerDetails(c._id)} title="View Details">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
+                        </svg>
+                        View
+                      </button>
+                      <button className="ac-btn ac-btn--delete" onClick={() => handleDelete(c._id, c.name)} title="Delete">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                          <polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                        </svg>
+                        Delete
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              )) : (
                 <tr>
-                  <td colSpan="6" className="empty-state">
-                    {searchQuery ? 'No customers found matching your search' : 'No customers available'}
+                  <td colSpan="6" className="ac-empty">
+                    <div className="ac-empty__icon">👥</div>
+                    <div className="ac-empty__title">No customers found</div>
+                    <div className="ac-empty__sub">{searchQuery ? 'Try a different search term' : 'No customers registered yet'}</div>
                   </td>
                 </tr>
               )}
@@ -258,86 +263,92 @@ const AdminCustomers = () => {
           </table>
         </div>
 
-        {/* Pagination */}
+        {/* ── Pagination ── */}
         {totalPages > 1 && (
-          <div className="pagination">
-            <button
-              onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-              disabled={currentPage === 1}
-              className="pagination-btn"
-            >
+          <div className="ac-pagination">
+            <button className="ac-page-btn" onClick={() => setCurrentPage(p => Math.max(1, p-1))} disabled={currentPage === 1}>
               ← Previous
             </button>
-            <div className="pagination-info">
-              Page {currentPage} of {totalPages}
+            <div className="ac-page-pills">
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
+                <button key={p} className={`ac-page-pill${p === currentPage ? ' ac-page-pill--active' : ''}`} onClick={() => setCurrentPage(p)}>
+                  {p}
+                </button>
+              ))}
             </div>
-            <button
-              onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
-              disabled={currentPage === totalPages}
-              className="pagination-btn"
-            >
+            <button className="ac-page-btn" onClick={() => setCurrentPage(p => Math.min(totalPages, p+1))} disabled={currentPage === totalPages}>
               Next →
             </button>
           </div>
         )}
 
-        {/* Customer Details Modal */}
+        {/* ── Customer Details Modal ── */}
         {selectedCustomer && (
-          <div className="modal-overlay" onClick={() => setSelectedCustomer(null)}>
-            <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-              <div className="modal-header">
-                <h2>Customer Details</h2>
-                <button onClick={() => setSelectedCustomer(null)} className="close-btn">
-                  ✕
+          <div className="ac-overlay" onClick={() => setSelectedCustomer(null)}>
+            <div className="ac-modal" onClick={e => e.stopPropagation()}>
+
+              <div className="ac-modal__header">
+                <div className="ac-modal__avatar" style={{ background: getAvatarGradient(selectedCustomer.name) }}>
+                  {getInitials(selectedCustomer.name)}
+                </div>
+                <div className="ac-modal__meta">
+                  <h2 className="ac-modal__name">{selectedCustomer.name}</h2>
+                  <span className="ac-badge ac-badge--active">Active Customer</span>
+                </div>
+                <button className="ac-modal__close" onClick={() => setSelectedCustomer(null)}>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                    <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                  </svg>
                 </button>
               </div>
 
-              <div className="modal-body">
-                <div className="customer-info-section">
-                  <h3>Personal Information</h3>
-                  <div className="info-grid">
-                    <div className="info-item">
-                      <span className="info-label">Name:</span>
-                      <span className="info-value">{selectedCustomer.name}</span>
-                    </div>
-                    <div className="info-item">
-                      <span className="info-label">Email:</span>
-                      <span className="info-value">{selectedCustomer.email}</span>
-                    </div>
-                    <div className="info-item">
-                      <span className="info-label">Phone:</span>
-                      <span className="info-value">{selectedCustomer.phone}</span>
-                    </div>
-                    <div className="info-item">
-                      <span className="info-label">Address:</span>
-                      <span className="info-value">
-                        {selectedCustomer.address?.street}, {selectedCustomer.address?.city},
-                        {selectedCustomer.address?.state} - {selectedCustomer.address?.zipCode}
-                      </span>
-                    </div>
+              <div className="ac-modal__body">
+                <div className="ac-modal__section">
+                  <h3 className="ac-modal__section-title">
+                    Personal Information
+                  </h3>
+                  <div className="ac-modal__info-grid">
+                    {[
+                      { label:'Full Name',    value: selectedCustomer.name,                   icon:'👤' },
+                      { label:'Email',        value: selectedCustomer.email,                  icon:'✉️' },
+                      { label:'Phone',        value: selectedCustomer.phone || '—',           icon:'📱' },
+                      { label:'Street',       value: selectedCustomer.address?.street || '—', icon:'📍' },
+                      { label:'City',         value: selectedCustomer.address?.city   || '—', icon:'🏙️' },
+                      { label:'State',        value: selectedCustomer.address?.state  || '—', icon:'🗺️' },
+                      { label:'PIN',          value: selectedCustomer.address?.zipCode|| '—', icon:'📮' },
+                      { label:'Member Since', value: fmtDate(selectedCustomer.createdAt),     icon:'📅' },
+                    ].map((f, i) => (
+                      <div className="ac-info-card" key={i}>
+                        <span className="ac-info-card__icon">{f.icon}</span>
+                        <div className="ac-info-card__body">
+                          <span className="ac-info-card__label">{f.label}</span>
+                          <span className="ac-info-card__value">{f.value}</span>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </div>
 
-                <div className="customer-orders-section">
-                  <h3>Order History ({customerOrders.length} orders)</h3>
-                  
+                <div className="ac-modal__section">
+                  <h3 className="ac-modal__section-title">
+                    Order History
+                    <span className="ac-modal__count">{customerOrders.length}</span>
+                  </h3>
                   {customerOrders.length === 0 ? (
-                    <p className="no-orders">No orders yet</p>
+                    <div className="ac-modal__no-orders">No orders placed yet</div>
                   ) : (
-                    <div className="orders-list">
-                      {customerOrders.map((order) => (
-                        <div key={order._id} className="order-item">
-                          <div className="order-info">
-                            <span className="order-number">#{order.orderNumber}</span>
-                            <span className="order-date">
-                              {new Date(order.createdAt).toLocaleDateString()}
-                            </span>
+                    <div className="ac-orders-list">
+                      {customerOrders.map(order => (
+                        <div className="ac-order-row" key={order._id}>
+                          <div className="ac-order-row__left">
+                            <span className="ac-order-num">#{order.orderNumber}</span>
+                            <span className="ac-order-date">{fmtDate(order.createdAt)}</span>
                           </div>
-                          <div className="order-details">
-                            <span className="order-amount">
+                          <div className="ac-order-row__right">
+                            <span className="ac-order-amount">
                               ₹{(order.totalAmount || order.totalPrice || 0).toLocaleString()}
                             </span>
-                            <span className={`badge badge-${getStatusColor(order.orderStatus)}`}>
+                            <span className={`ac-badge ac-badge--${getStatusColor(order.orderStatus)}`}>
                               {order.orderStatus}
                             </span>
                           </div>
@@ -347,24 +358,22 @@ const AdminCustomers = () => {
                   )}
                 </div>
               </div>
+
+              <div className="ac-modal__footer">
+                <button className="ac-btn--delete-lg" onClick={() => { handleDelete(selectedCustomer._id, selectedCustomer.name); setSelectedCustomer(null); }}>
+                  Delete Customer
+                </button>
+                <button className="ac-btn--close-modal" onClick={() => setSelectedCustomer(null)}>
+                  Close
+                </button>
+              </div>
             </div>
           </div>
         )}
+
       </div>
     </AdminLayout>
   );
-};
-
-const getStatusColor = (status) => {
-  const colors = {
-    pending: 'warning',
-    confirmed: 'primary',
-    processing: 'primary',
-    shipped: 'primary',
-    delivered: 'success',
-    cancelled: 'danger'
-  };
-  return colors[status] || 'primary';
 };
 
 export default AdminCustomers;

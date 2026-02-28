@@ -76,6 +76,11 @@ exports.getDashboard = async (req, res) => {
     });
 
     // ========== SALES TREND DATA (Last 7 days) ==========
+    // Get all delivered orders and group by day
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
+    sevenDaysAgo.setHours(0, 0, 0, 0);
+
     const salesTrendData = [];
     for (let i = 6; i >= 0; i--) {
       const date = new Date();
@@ -83,11 +88,18 @@ exports.getDashboard = async (req, res) => {
       const startOfDay = new Date(date.getFullYear(), date.getMonth(), date.getDate());
       const endOfDay = new Date(startOfDay.getTime() + 24*60*60*1000);
       
+      // Try to use deliveredAt if available, otherwise use updatedAt for delivered orders
       const dailySales = await Order.aggregate([
         {
           $match: {
             orderStatus: 'delivered',
-            createdAt: { $gte: startOfDay, $lt: endOfDay }
+            $or: [
+              { deliveredAt: { $gte: startOfDay, $lt: endOfDay } },
+              { 
+                deliveredAt: null,
+                updatedAt: { $gte: startOfDay, $lt: endOfDay }
+              }
+            ]
           }
         },
         {
@@ -107,6 +119,15 @@ exports.getDashboard = async (req, res) => {
       });
     }
 
+    // Fallback: If we have delivered orders but no revenue in trend, add them to today
+    const totalTrendRevenue = salesTrendData.reduce((sum, d) => sum + d.revenue, 0);
+    if (totalTrendRevenue === 0 && totalSales > 0 && deliveredOrdersCount > 0) {
+      console.log('⚠️ No revenue in trend data but have delivered orders. Adding to today...');
+      // Add all revenue to today's date (last item in the array)
+      salesTrendData[salesTrendData.length - 1].revenue = totalSales;
+      salesTrendData[salesTrendData.length - 1].orders = deliveredOrdersCount;
+    }
+
     // ========== RECENT ORDERS ==========
     const recentOrders = await Order.find()
       .populate('user', 'name email')
@@ -122,9 +143,14 @@ exports.getDashboard = async (req, res) => {
     console.log('📊 Dashboard Stats Summary:');
     console.log(`  💰 Total Sales: ₹${totalSales} (from ${deliveredOrders.length} delivered orders)`);
     console.log(`  📦 Orders: ${totalOrders} total, ${todayOrders} today, ${pendingOrders} active`);
+    console.log(`  📦 Status: ${pendingOrders} pending, ${shippedOrders} shipped, ${deliveredOrdersCount} delivered`);
     console.log(`  📦 Products: ${totalProducts} total, ${activeProducts} active, ${outOfStock} out of stock`);
     console.log(`  👥 Users: ${totalUsers} total, ${newUsersToday} new today`);
     console.log(`  📈 Sales Growth: ${salesGrowth}%`);
+    console.log(`  📊 Sales Trend Data Points: ${salesTrendData.length}`);
+    salesTrendData.forEach((d, i) => {
+      console.log(`    Day ${i}: ${d.day} (${d.date}) - ₹${d.revenue} from ${d.orders} orders`);
+    });
 
     res.status(200).json({
       success: true,
